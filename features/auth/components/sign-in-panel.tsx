@@ -48,7 +48,7 @@ export function SignInPanel({ initialError }: { initialError?: string }) {
     event.preventDefault();
 
     const parsed = magicLinkSchema.safeParse({
-      email,
+      email: email.trim().toLowerCase(),
       callbackURL: "/employee",
       errorCallbackURL: "/sign-in",
     });
