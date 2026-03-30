@@ -3,7 +3,7 @@ import Link from "next/link";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
 import { getSession } from "@/lib/auth/permissions";
 
-const primaryLinks = [
+const primaryLinks: { href: "/ops" | "/employee"; label: string }[] = [
   { href: "/ops", label: "Ops" },
   { href: "/employee", label: "Employee" },
 ];
