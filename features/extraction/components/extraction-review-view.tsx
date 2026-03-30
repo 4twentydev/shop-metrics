@@ -107,7 +107,7 @@ export function ExtractionReviewView({ data }: ExtractionReviewViewProps) {
         ).map((card) => (
           <Link
             key={card.label}
-            href={card.href}
+            href={card.href as Route}
             className="rounded-[1.75rem] border border-line/80 bg-panel-strong p-6"
           >
             <p className="text-sm text-muted">{card.label}</p>
