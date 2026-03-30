@@ -9,6 +9,7 @@ import {
   jobDocuments,
   jobReleases,
   jobs,
+  metricTargets,
   releaseComments,
   releaseExtractionRuns,
   releaseIntakeBatches,
@@ -351,6 +352,7 @@ async function main() {
         releaseCode: "R1",
         revisionCode: "A",
         status: "READY",
+        partFamily: "DISCONNECT",
         panelBaseline: "640.00",
         baselineApprovedAt: now,
         baselineApprovedByUserId: "usr_ops_lead",
@@ -363,6 +365,7 @@ async function main() {
         releaseCode: "RMK1",
         revisionCode: "B",
         status: "READY",
+        partFamily: "METERING",
         panelBaseline: "180.00",
         baselineApprovedAt: now,
         baselineApprovedByUserId: "usr_ops_lead",
@@ -375,6 +378,7 @@ async function main() {
         releaseCode: "RME1",
         revisionCode: "A",
         status: "PENDING_BASELINE",
+        partFamily: "METERING",
         plannedShipDate: "2026-04-12",
         dueDate: "2026-04-10",
         notes: "Engineering revision release awaiting baseline.",
@@ -384,6 +388,7 @@ async function main() {
         releaseCode: "A1",
         revisionCode: "A",
         status: "PENDING_BASELINE",
+        partFamily: "ACCESSORY",
         plannedShipDate: "2026-04-20",
         dueDate: "2026-04-18",
         notes: "Accessory release type demo.",
@@ -825,6 +830,7 @@ async function main() {
         verificationStatus: "UNVERIFIED",
         versionCount: 1,
         isRework: true,
+        reworkSource: "INTERNAL_FAULT",
         faultDepartmentId: cnc.id,
         fixingDepartmentId: panelPrep.id,
         reworkNotes: "Damaged corners corrected during panel prep.",
@@ -849,6 +855,26 @@ async function main() {
         verifiedAt: now,
         verifiedByUserId: "usr_ops_lead",
         createdByUserId: "usr_employee_cnc",
+      },
+      {
+        submissionId: jordanSubmission.id,
+        jobReleaseId: seededRelease.id,
+        stationId: panelPrepStation.id,
+        departmentId: panelPrep.id,
+        nativeUnitType: panelPrep.nativeUnitLabel,
+        nativeQuantity: "2.00",
+        panelEquivalentQuantity: "2.00",
+        businessDate: "2026-03-29",
+        shiftId: dayShift.id,
+        verificationStatus: "VERIFIED",
+        isRework: true,
+        reworkSource: "INSTALLER_FAULT",
+        faultDepartmentId: assembly.id,
+        fixingDepartmentId: panelPrep.id,
+        reworkNotes: "Field damage remake returned from installer site.",
+        verifiedAt: now,
+        verifiedByUserId: "usr_department_lead",
+        createdByUserId: "usr_employee",
       },
     ])
     .onConflictDoNothing();
@@ -959,16 +985,68 @@ async function main() {
     })
     .onConflictDoNothing();
 
+  await db
+    .insert(metricTargets)
+    .values([
+      {
+        windowType: "DAILY",
+        scopeType: "COMPANY",
+        scopeKey: "ELWARD_SYSTEMS",
+        metricKey: "panel_output",
+        targetValue: "96.00",
+        unitLabel: "panels",
+        effectiveStart: "2026-03-01",
+        enteredByUserId: "usr_admin_elward",
+        notes: "Daily company output target.",
+      },
+      {
+        windowType: "DAILY",
+        scopeType: "DEPARTMENT",
+        scopeReferenceId: panelPrep.id,
+        scopeKey: panelPrep.code,
+        metricKey: "panel_output",
+        targetValue: "48.00",
+        unitLabel: "panels",
+        effectiveStart: "2026-03-01",
+        enteredByUserId: "usr_ops_lead",
+        notes: "Panel Prep daily output target.",
+      },
+      {
+        windowType: "WEEKLY",
+        scopeType: "RELEASE",
+        scopeReferenceId: seededRelease.id,
+        scopeKey: seededRelease.releaseCode,
+        metricKey: "completion_percentage",
+        targetValue: "100.00",
+        unitLabel: "percent",
+        effectiveStart: "2026-03-23",
+        enteredByUserId: "usr_ops_lead",
+        notes: "Release should be fully complete by the end of the week.",
+      },
+      {
+        windowType: "MONTHLY",
+        scopeType: "PART_FAMILY",
+        scopeKey: "DISCONNECT",
+        metricKey: "panel_output",
+        targetValue: "640.00",
+        unitLabel: "panels",
+        effectiveStart: "2026-03-01",
+        enteredByUserId: "usr_admin_elward",
+        notes: "Monthly disconnect-family throughput target.",
+      },
+    ])
+    .onConflictDoNothing();
+
   await db.insert(auditLogs).values({
     actorUserId: "usr_admin_elward",
     action: "seed.completed",
     entityType: "system",
     entityId: "foundation",
-    metadata: {
-      users: seededUsers.length,
-      departments: 6,
-      version: 4,
-    },
+      metadata: {
+        users: seededUsers.length,
+        departments: 6,
+        version: 5,
+      },
   });
 
   console.info("Seed complete.");

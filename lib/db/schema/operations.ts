@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  index,
   integer,
   jsonb,
   numeric,
@@ -94,6 +95,28 @@ export const workEntryChangeTypeEnum = pgEnum("work_entry_change_type", [
   "COMMENTED",
   "SUBMITTED",
   "REOPENED",
+]);
+
+export const reworkSourceEnum = pgEnum("rework_source", [
+  "UNKNOWN",
+  "INTERNAL_FAULT",
+  "INSTALLER_FAULT",
+]);
+
+export const metricWindowEnum = pgEnum("metric_window", [
+  "DAILY",
+  "WEEKLY",
+  "MONTHLY",
+  "ANNUAL",
+]);
+
+export const metricScopeEnum = pgEnum("metric_scope", [
+  "EMPLOYEE",
+  "DEPARTMENT",
+  "JOB",
+  "RELEASE",
+  "COMPANY",
+  "PART_FAMILY",
 ]);
 
 export const shifts = pgTable("shifts", {
@@ -268,6 +291,7 @@ export const jobReleases = pgTable(
     releaseCode: varchar("release_code", { length: 32 }).notNull(),
     revisionCode: varchar("revision_code", { length: 32 }).notNull(),
     status: releaseStatusEnum("status").notNull().default("PENDING_BASELINE"),
+    partFamily: varchar("part_family", { length: 64 }),
     panelBaseline: numeric("panel_baseline", {
       precision: 12,
       scale: 2,
@@ -311,6 +335,7 @@ export const jobReleases = pgTable(
       table.jobId,
       table.releaseCode,
     ),
+    index("job_releases_part_family_idx").on(table.partFamily),
   ],
 );
 
@@ -583,6 +608,7 @@ export const workEntries = pgTable("work_entries", {
   }),
   leadCommentCount: integer("lead_comment_count").notNull().default(0),
   isRework: boolean("is_rework").notNull().default(false),
+  reworkSource: reworkSourceEnum("rework_source").notNull().default("UNKNOWN"),
   faultDepartmentId: uuid("fault_department_id").references(
     () => departments.id,
     { onDelete: "set null" },
@@ -654,3 +680,88 @@ export const workEntryComments = pgTable("work_entry_comments", {
     .notNull()
     .defaultNow(),
 });
+
+export const metricTargets = pgTable(
+  "metric_targets",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    windowType: metricWindowEnum("window_type").notNull(),
+    scopeType: metricScopeEnum("scope_type").notNull(),
+    scopeReferenceId: uuid("scope_reference_id"),
+    scopeKey: varchar("scope_key", { length: 128 }),
+    metricKey: varchar("metric_key", { length: 96 }).notNull(),
+    targetValue: numeric("target_value", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+    unitLabel: varchar("unit_label", { length: 48 }).notNull(),
+    effectiveStart: date("effective_start").notNull(),
+    effectiveEnd: date("effective_end"),
+    notes: text("notes"),
+    enteredByUserId: text("entered_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("metric_targets_scope_window_idx").on(
+      table.windowType,
+      table.scopeType,
+      table.scopeReferenceId,
+      table.scopeKey,
+      table.effectiveStart,
+    ),
+  ],
+);
+
+export const metricSnapshots = pgTable(
+  "metric_snapshots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    capturedAt: timestamp("captured_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+    windowType: metricWindowEnum("window_type").notNull(),
+    windowStart: date("window_start").notNull(),
+    windowEnd: date("window_end").notNull(),
+    scopeType: metricScopeEnum("scope_type").notNull(),
+    scopeReferenceId: uuid("scope_reference_id"),
+    scopeKey: varchar("scope_key", { length: 128 }),
+    metrics: jsonb("metrics").notNull(),
+    targetSummary: jsonb("target_summary").notNull(),
+    sourceSummary: jsonb("source_summary").notNull(),
+    createdByUserId: text("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("metric_snapshots_window_scope_idx").on(
+      table.windowType,
+      table.windowStart,
+      table.windowEnd,
+      table.scopeType,
+      table.scopeReferenceId,
+      table.scopeKey,
+    ),
+  ],
+);

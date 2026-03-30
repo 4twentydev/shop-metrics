@@ -20,6 +20,7 @@ Production foundation for a panel-centric manufacturing metrics platform built o
 - Employee and lead work-entry vertical slice
 - Release intake and document revision vertical slice
 - Gemini extraction review vertical slice
+- Snapshot-based metrics engine with targets and tested formulas
 
 ## Architecture notes
 
@@ -30,6 +31,7 @@ Production foundation for a panel-centric manufacturing metrics platform built o
   - panel-equivalent formulas: [`features/metrics/formulas.ts`](./features/metrics/formulas.ts)
   - business-day helpers: [`features/time/business-day.ts`](./features/time/business-day.ts)
   - extraction normalization: [`features/extraction/normalization.ts`](./features/extraction/normalization.ts)
+  - snapshot metrics engine: [`features/metrics/engine.ts`](./features/metrics/engine.ts)
 - Better Auth is configured without email/password accounts. Users are expected to be provisioned by admins, then sign in by passkey or magic link.
 - The initial schema is intentionally operationally focused: users, employees, roles, departments, stations, assignments, shifts, jobs, releases, documents, audit logs, plus the auth support tables Better Auth requires.
 - PDF upload handling is abstracted behind a storage interface so document ingestion can be implemented without binding page logic to a single storage provider.
@@ -39,6 +41,10 @@ Production foundation for a panel-centric manufacturing metrics platform built o
   - explicit input schemas
   - versioned entry history
   - lead comments and verification
+- Reporting is snapshot-based:
+  - raw operational rows are aggregated by window and scope into `metric_snapshots`
+  - targets are stored separately in `metric_targets`
+  - dashboard/reporting reads can prefer snapshots over live multi-join aggregation
 
 ## Folder structure
 
@@ -64,6 +70,7 @@ lib/
   storage/
 drizzle/
 scripts/
+tests/
 ```
 
 ## Environment variables
@@ -120,6 +127,12 @@ Conditional:
    npm run dev
    ```
 
+7. Run the metrics formula tests once Node/npm is running natively inside WSL:
+
+   ```bash
+   tsx --test tests/metrics/formulas.test.ts
+   ```
+
 ## Vercel deployment
 
 1. Push the repository to GitHub.
@@ -132,11 +145,11 @@ Conditional:
    - `BETTER_AUTH_RP_ID`
    - `BETTER_AUTH_TRUSTED_ORIGIN`
    - `AUTH_FROM_EMAIL`
-  - `RESEND_API_KEY`
-  - `STORAGE_DRIVER=vercel-blob`
-  - `BLOB_READ_WRITE_TOKEN`
-  - `GEMINI_API_KEY`
-  - `GEMINI_MODEL`
+   - `RESEND_API_KEY`
+   - `STORAGE_DRIVER=vercel-blob`
+   - `BLOB_READ_WRITE_TOKEN`
+   - `GEMINI_API_KEY`
+   - `GEMINI_MODEL`
 5. Run `npm run db:migrate` against the production database before first use.
 6. Redeploy after the environment variables are saved.
 
@@ -146,6 +159,8 @@ Conditional:
 - SQL migration: [`drizzle/0000_foundation.sql`](./drizzle/0000_foundation.sql)
 - SQL migration: [`drizzle/0001_work_entry_vertical_slice.sql`](./drizzle/0001_work_entry_vertical_slice.sql)
 - SQL migration: [`drizzle/0002_release_intake_documents.sql`](./drizzle/0002_release_intake_documents.sql)
+- SQL migration: [`drizzle/0003_gemini_release_extraction.sql`](./drizzle/0003_gemini_release_extraction.sql)
+- SQL migration: [`drizzle/0004_metrics_engine.sql`](./drizzle/0004_metrics_engine.sql)
 - Seed script: [`scripts/seed.ts`](./scripts/seed.ts)
 
 ## Work-entry routes
@@ -190,6 +205,17 @@ Conditional:
 - Reopen requires a reason and is written to the audit log.
 - Entry edits are versioned and marked with editor and reason.
 - Future department extension notes: [`features/work-entries/extension-notes.md`](./features/work-entries/extension-notes.md)
+
+## Metrics engine notes
+
+- Metric logic is UI-independent and centralized under [`features/metrics`](./features/metrics).
+- Supported windows: `DAILY`, `WEEKLY`, `MONTHLY`, `ANNUAL`.
+- Supported scopes: employee, department, job, release, company, and part family.
+- Completion uses non-rework panel-equivalent output against approved release baselines.
+- Accountability metrics include edited entries, unverified entries, reopen counts, missing normalization mappings, and stale baseline panel impact.
+- Snapshot jobs live in [`features/metrics/snapshot-job.ts`](./features/metrics/snapshot-job.ts).
+- Performance notes live in [`features/metrics/performance-notes.md`](./features/metrics/performance-notes.md).
+- Formula coverage lives in [`tests/metrics/formulas.test.ts`](./tests/metrics/formulas.test.ts).
 
 ## Auth notes
 

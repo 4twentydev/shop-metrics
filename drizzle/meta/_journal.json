@@ -29,6 +29,13 @@
       "when": 1774854000000,
       "tag": "0003_gemini_release_extraction",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1774857600000,
+      "tag": "0004_metrics_engine",
+      "breakpoints": true
     }
   ]
 }
