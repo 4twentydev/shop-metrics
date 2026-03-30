@@ -53,6 +53,7 @@ export function DisplayPlaylistRuntime({
           templateSlug: currentTemplateSlug,
           path: `${basePath}/${playlistSlug}`,
           anchorDate: anchorDate ?? null,
+          heartbeatIntervalSeconds,
         }),
       });
     };

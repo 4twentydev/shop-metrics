@@ -155,10 +155,32 @@ export const notificationChannelEnum = pgEnum("notification_channel", [
   "EMAIL",
 ]);
 
+export const notificationEventTypeEnum = pgEnum("notification_event_type", [
+  "STALE_BASELINE",
+  "FAILED_EXTRACTION",
+  "DISPLAY_STALE_HEARTBEAT",
+]);
+
 export const notificationDeliveryStatusEnum = pgEnum(
   "notification_delivery_status",
   ["PENDING", "SENT", "FAILED"],
 );
+
+export const displayAlertStatusEnum = pgEnum("display_alert_status", [
+  "ACTIVE",
+  "RESOLVED",
+]);
+
+export const displayAlertTypeEnum = pgEnum("display_alert_type", [
+  "STALE_HEARTBEAT",
+]);
+
+export const cleanupStatusEnum = pgEnum("cleanup_status", [
+  "ACTIVE",
+  "EXPIRED",
+  "DELETED",
+  "FAILED",
+]);
 
 export const configChangeActionEnum = pgEnum("config_change_action", [
   "CREATED",
@@ -604,25 +626,27 @@ export const releaseReadinessNotifications = pgTable(
   ],
 );
 
-export const notificationDeliveries = pgTable(
-  "notification_deliveries",
+export const notificationPreferences = pgTable(
+  "notification_preferences",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    readinessNotificationId: uuid("readiness_notification_id")
+    userId: text("user_id")
       .notNull()
-      .references(() => releaseReadinessNotifications.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "cascade" }),
+    eventType: notificationEventTypeEnum("event_type").notNull(),
     channel: notificationChannelEnum("channel").notNull(),
-    recipient: varchar("recipient", { length: 255 }).notNull(),
-    status: notificationDeliveryStatusEnum("status").notNull().default("PENDING"),
-    provider: varchar("provider", { length: 64 }),
-    providerMessageId: varchar("provider_message_id", { length: 255 }),
-    sentAt: timestamp("sent_at", {
+    isEnabled: boolean("is_enabled").notNull().default(true),
+    minimumRepeatMinutes: integer("minimum_repeat_minutes").notNull().default(60),
+    updatedByUserId: text("updated_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", {
       withTimezone: true,
       mode: "date",
-    }),
-    errorMessage: text("error_message"),
-    metadata: jsonb("metadata"),
-    createdAt: timestamp("created_at", {
+    })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", {
       withTimezone: true,
       mode: "date",
     })
@@ -630,10 +654,49 @@ export const notificationDeliveries = pgTable(
       .defaultNow(),
   },
   (table) => [
-    uniqueIndex("notification_deliveries_unique_idx").on(
-      table.readinessNotificationId,
+    uniqueIndex("notification_preferences_unique_idx").on(
+      table.userId,
+      table.eventType,
       table.channel,
-      table.recipient,
+    ),
+  ],
+);
+
+export const notificationEscalationPolicies = pgTable(
+  "notification_escalation_policies",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    eventType: notificationEventTypeEnum("event_type").notNull(),
+    channel: notificationChannelEnum("channel").notNull(),
+    roleSlug: varchar("role_slug", { length: 64 }).notNull(),
+    escalationOrder: integer("escalation_order").notNull().default(1),
+    repeatMinutes: integer("repeat_minutes").notNull().default(60),
+    isActive: boolean("is_active").notNull().default(true),
+    createdByUserId: text("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    updatedByUserId: text("updated_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("notification_escalation_policies_unique_idx").on(
+      table.eventType,
+      table.channel,
+      table.roleSlug,
+      table.escalationOrder,
     ),
   ],
 );
@@ -1131,6 +1194,86 @@ export const displayScreenHeartbeats = pgTable(
   (table) => [index("display_screen_heartbeats_last_seen_idx").on(table.lastSeenAt)],
 );
 
+export const displayAlerts = pgTable(
+  "display_alerts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    playlistId: uuid("playlist_id").references(() => displayPlaylists.id, {
+      onDelete: "set null",
+    }),
+    screenHeartbeatId: uuid("screen_heartbeat_id")
+      .notNull()
+      .references(() => displayScreenHeartbeats.id, { onDelete: "cascade" }),
+    alertType: displayAlertTypeEnum("alert_type").notNull(),
+    status: displayAlertStatusEnum("status").notNull().default("ACTIVE"),
+    message: text("message").notNull(),
+    detectedAt: timestamp("detected_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+    resolvedAt: timestamp("resolved_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    lastEvaluatedAt: timestamp("last_evaluated_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+    metadata: jsonb("metadata"),
+  },
+  (table) => [
+    uniqueIndex("display_alerts_unique_idx").on(
+      table.screenHeartbeatId,
+      table.alertType,
+    ),
+  ],
+);
+
+export const notificationDeliveries = pgTable(
+  "notification_deliveries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    eventType: notificationEventTypeEnum("event_type").notNull(),
+    readinessNotificationId: uuid("readiness_notification_id").references(
+      () => releaseReadinessNotifications.id,
+      { onDelete: "cascade" },
+    ),
+    displayAlertId: uuid("display_alert_id").references(() => displayAlerts.id, {
+      onDelete: "cascade",
+    }),
+    channel: notificationChannelEnum("channel").notNull(),
+    recipient: varchar("recipient", { length: 255 }).notNull(),
+    status: notificationDeliveryStatusEnum("status").notNull().default("PENDING"),
+    provider: varchar("provider", { length: 64 }),
+    providerMessageId: varchar("provider_message_id", { length: 255 }),
+    sentAt: timestamp("sent_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    errorMessage: text("error_message"),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("notification_deliveries_unique_idx").on(
+      table.eventType,
+      table.channel,
+      table.recipient,
+      table.readinessNotificationId,
+      table.displayAlertId,
+    ),
+  ],
+);
+
 export const reportExportDeliveries = pgTable(
   "report_export_deliveries",
   {
@@ -1160,6 +1303,16 @@ export const reportExportDeliveries = pgTable(
     byteSize: integer("byte_size"),
     rowCount: integer("row_count").notNull().default(0),
     errorMessage: text("error_message"),
+    retentionDays: integer("retention_days").notNull().default(30),
+    expiresAt: timestamp("expires_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    cleanupStatus: cleanupStatusEnum("cleanup_status").notNull().default("ACTIVE"),
+    cleanedUpAt: timestamp("cleaned_up_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
     requestedByUserId: text("requested_by_user_id").references(() => users.id, {
       onDelete: "set null",
     }),
@@ -1202,6 +1355,16 @@ export const reportExportArtifacts = pgTable(
     storageUrl: text("storage_url"),
     checksumSha256: varchar("checksum_sha256", { length: 64 }),
     byteSize: integer("byte_size"),
+    retentionDays: integer("retention_days").notNull().default(30),
+    expiresAt: timestamp("expires_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    cleanupStatus: cleanupStatusEnum("cleanup_status").notNull().default("ACTIVE"),
+    cleanedUpAt: timestamp("cleaned_up_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
     manifestEntry: jsonb("manifest_entry"),
     createdAt: timestamp("created_at", {
       withTimezone: true,

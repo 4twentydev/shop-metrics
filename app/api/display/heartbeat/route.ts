@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
     templateSlug?: string | null;
     path?: string | null;
     anchorDate?: string | null;
+    heartbeatIntervalSeconds?: number | null;
   };
 
   if (!hasPublicDisplayAccess(body.accessToken ?? null)) {
@@ -40,6 +41,7 @@ export async function POST(request: NextRequest) {
         lastSeenAt: new Date(),
         metadata: {
           source: "kiosk-heartbeat",
+          heartbeatIntervalSeconds: body.heartbeatIntervalSeconds ?? null,
         },
         updatedAt: new Date(),
       })
@@ -55,6 +57,7 @@ export async function POST(request: NextRequest) {
       lastSeenAt: new Date(),
       metadata: {
         source: "kiosk-heartbeat",
+        heartbeatIntervalSeconds: body.heartbeatIntervalSeconds ?? null,
       },
     });
   }

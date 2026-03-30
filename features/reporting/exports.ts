@@ -9,6 +9,7 @@ import { fileStorage } from "@/lib/storage";
 import { formatNumber } from "@/lib/utils";
 
 import type { ReportDataset, ReportExportFormat, ReportViewModel } from "./types";
+import { calculateExpiry } from "./retention";
 
 function escapeCsvCell(value: string) {
   if (value.includes(",") || value.includes("\"") || value.includes("\n")) {
@@ -292,8 +293,11 @@ export async function recordReportDelivery(input: {
   storageProvider?: string | null;
   storageKey?: string | null;
   storageUrl?: string | null;
+  retentionDays?: number;
   requestedByUserId?: string | null;
 }) {
+  const deliveredAt = new Date();
+  const retentionDays = input.retentionDays ?? 30;
   const inserted = await db
     .insert(reportExportDeliveries)
     .values({
@@ -315,8 +319,13 @@ export async function recordReportDelivery(input: {
       storageUrl: input.storageUrl ?? null,
       byteSize: input.byteSize,
       rowCount: input.rowCount,
+      retentionDays,
+      expiresAt: calculateExpiry({
+        deliveredAt,
+        retentionDays,
+      }),
       requestedByUserId: input.requestedByUserId ?? null,
-      deliveredAt: new Date(),
+      deliveredAt,
     })
     .returning({ id: reportExportDeliveries.id });
 
@@ -336,6 +345,8 @@ export async function recordReportArtifacts(input: {
     storageUrl?: string | null;
     checksumSha256?: string | null;
     byteSize?: number | null;
+    retentionDays?: number | null;
+    expiresAt?: Date | null;
     manifestEntry?: Record<string, unknown> | null;
   }>;
 }) {
@@ -356,6 +367,8 @@ export async function recordReportArtifacts(input: {
       storageUrl: artifact.storageUrl ?? null,
       checksumSha256: artifact.checksumSha256 ?? null,
       byteSize: artifact.byteSize ?? null,
+      retentionDays: artifact.retentionDays ?? 30,
+      expiresAt: artifact.expiresAt ?? null,
       manifestEntry: artifact.manifestEntry ?? null,
     })),
   );
@@ -466,6 +479,7 @@ export async function buildAndStoreReportBundle(input: {
         checksumSha256: member.checksumSha256,
       })),
     },
+    retentionDays: 90,
     requestedByUserId: input.requestedByUserId ?? null,
   });
 
@@ -481,6 +495,11 @@ export async function buildAndStoreReportBundle(input: {
         storageUrl: storedArchive.storageUrl,
         checksumSha256: archiveChecksum,
         byteSize: archiveBody.byteLength,
+        retentionDays: 90,
+        expiresAt: calculateExpiry({
+          deliveredAt: new Date(),
+          retentionDays: 90,
+        }),
         manifestEntry: {
           type: "bundle",
           memberCount: members.length,
@@ -497,6 +516,11 @@ export async function buildAndStoreReportBundle(input: {
         storageUrl: member.storageUrl,
         checksumSha256: member.checksumSha256,
         byteSize: member.body.byteLength,
+        retentionDays: 90,
+        expiresAt: calculateExpiry({
+          deliveredAt: new Date(),
+          retentionDays: 90,
+        }),
         manifestEntry: {
           dataset: member.dataset,
           format: member.format,

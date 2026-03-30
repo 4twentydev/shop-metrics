@@ -4,6 +4,10 @@ import {
   saveMetricTargetAction,
 } from "@/features/metrics/actions";
 import {
+  saveEscalationPolicyAction,
+  saveNotificationPreferenceAction,
+} from "@/features/governance/actions";
+import {
   deleteReportTemplateAction,
   restoreReportTemplateAction,
   saveReportTemplateAction,
@@ -79,12 +83,26 @@ export function ReportingAdminView({ data }: ReportingAdminViewProps) {
                           <span className="text-muted">Unavailable</span>
                         )}
                         {delivery.packageType === "BUNDLE" ? (
-                          <span className="rounded-full border border-line px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-muted">
-                            {Array.isArray((delivery.packageManifest as { members?: unknown[] } | null)?.members)
-                              ? `${(delivery.packageManifest as { members: unknown[] }).members.length} files`
-                              : "bundle"}
-                          </span>
+                          <>
+                            <span className="rounded-full border border-line px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-muted">
+                              {Array.isArray((delivery.packageManifest as { members?: unknown[] } | null)?.members)
+                                ? `${(delivery.packageManifest as { members: unknown[] }).members.length} files`
+                                : "bundle"}
+                            </span>
+                            {delivery.signedDownloadPath ? (
+                              <a
+                                href={delivery.signedDownloadPath}
+                                className="rounded-full border border-line px-3 py-1 text-xs font-semibold"
+                              >
+                                Signed link
+                              </a>
+                            ) : null}
+                          </>
                         ) : null}
+                      </div>
+                      <div className="mt-2 text-xs text-muted">
+                        {delivery.cleanupStatus} · expires{" "}
+                        {delivery.expiresAt ? delivery.expiresAt.toISOString() : "n/a"}
                       </div>
                     </td>
                   </tr>
@@ -445,6 +463,139 @@ export function ReportingAdminView({ data }: ReportingAdminViewProps) {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className="rounded-[1.75rem] border border-line/80 bg-panel-strong p-6">
+            <p className="font-semibold">Display alerts</p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <a
+                href="/ops/reports/display/monitoring"
+                className="rounded-full border border-line px-4 py-2 text-sm font-semibold"
+              >
+                Open kiosk monitoring
+              </a>
+            </div>
+            <div className="mt-4 space-y-3 text-sm">
+              {data.displayMonitoring.alerts.slice(0, 6).map((alert) => (
+                <div key={alert.id} className="rounded-2xl border border-line/80 bg-white/[0.03] p-4">
+                  <p className="font-semibold">{alert.alertType.replaceAll("_", " ")}</p>
+                  <p className="mt-1 text-muted">{alert.message}</p>
+                  <p className="mt-2 text-muted">
+                    {alert.status} · detected {alert.detectedAt.toISOString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-2">
+        <div className="rounded-[1.75rem] border border-line/80 bg-panel-strong p-6">
+          <p className="font-semibold">Notification preferences</p>
+          <form action={saveNotificationPreferenceAction} className="mt-4 grid gap-3 sm:grid-cols-2">
+            <select name="userId" className="rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm">
+              {data.userDirectory.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.name ?? user.email}
+                </option>
+              ))}
+            </select>
+            <select name="eventType" className="rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm">
+              <option value="STALE_BASELINE">Stale baseline</option>
+              <option value="FAILED_EXTRACTION">Failed extraction</option>
+              <option value="DISPLAY_STALE_HEARTBEAT">Display stale heartbeat</option>
+            </select>
+            <select name="channel" className="rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm">
+              <option value="EMAIL">Email</option>
+              <option value="IN_APP">In app</option>
+            </select>
+            <input name="minimumRepeatMinutes" type="number" min="5" max="1440" defaultValue={60} className="rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm" />
+            <label className="sm:col-span-2 flex items-center gap-3 text-sm text-muted">
+              <input type="checkbox" name="isEnabled" defaultChecked />
+              Enabled
+            </label>
+            <button type="submit" className="justify-self-start rounded-full bg-accent px-5 py-3 text-sm font-semibold text-black">
+              Save preference
+            </button>
+          </form>
+          <div className="mt-6 space-y-3 text-sm">
+            {data.notificationPrefs.map((preference) => (
+              <form key={preference.id} action={saveNotificationPreferenceAction} className="grid gap-3 rounded-2xl border border-line/80 bg-white/[0.03] p-4 sm:grid-cols-2">
+                <input type="hidden" name="preferenceId" value={preference.id} />
+                <input type="hidden" name="userId" value={preference.userId} />
+                <div>{preference.userName ?? preference.userEmail}</div>
+                <div className="text-muted">{preference.userEmail}</div>
+                <select name="eventType" defaultValue={preference.eventType} className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm">
+                  <option value="STALE_BASELINE">Stale baseline</option>
+                  <option value="FAILED_EXTRACTION">Failed extraction</option>
+                  <option value="DISPLAY_STALE_HEARTBEAT">Display stale heartbeat</option>
+                </select>
+                <select name="channel" defaultValue={preference.channel} className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm">
+                  <option value="EMAIL">Email</option>
+                  <option value="IN_APP">In app</option>
+                </select>
+                <input name="minimumRepeatMinutes" type="number" min="5" max="1440" defaultValue={preference.minimumRepeatMinutes} className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm" />
+                <label className="flex items-center gap-3 text-sm text-muted">
+                  <input type="checkbox" name="isEnabled" defaultChecked={preference.isEnabled} />
+                  Enabled
+                </label>
+                <button type="submit" className="justify-self-start rounded-full border border-line px-4 py-2 text-sm font-semibold">
+                  Update preference
+                </button>
+              </form>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-[1.75rem] border border-line/80 bg-panel-strong p-6">
+          <p className="font-semibold">Escalation policies</p>
+          <form action={saveEscalationPolicyAction} className="mt-4 grid gap-3 sm:grid-cols-2">
+            <select name="eventType" className="rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm">
+              <option value="STALE_BASELINE">Stale baseline</option>
+              <option value="FAILED_EXTRACTION">Failed extraction</option>
+              <option value="DISPLAY_STALE_HEARTBEAT">Display stale heartbeat</option>
+            </select>
+            <select name="channel" className="rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm">
+              <option value="EMAIL">Email</option>
+              <option value="IN_APP">In app</option>
+            </select>
+            <input name="roleSlug" placeholder="platform_admin" className="rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm" />
+            <input name="escalationOrder" type="number" min="1" max="10" defaultValue={1} className="rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm" />
+            <input name="repeatMinutes" type="number" min="5" max="1440" defaultValue={60} className="rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm" />
+            <label className="flex items-center gap-3 text-sm text-muted">
+              <input type="checkbox" name="isActive" defaultChecked />
+              Active
+            </label>
+            <button type="submit" className="justify-self-start rounded-full bg-accent px-5 py-3 text-sm font-semibold text-black">
+              Save policy
+            </button>
+          </form>
+          <div className="mt-6 space-y-3 text-sm">
+            {data.escalationPolicies.map((policy) => (
+              <form key={policy.id} action={saveEscalationPolicyAction} className="grid gap-3 rounded-2xl border border-line/80 bg-white/[0.03] p-4 sm:grid-cols-2">
+                <input type="hidden" name="policyId" value={policy.id} />
+                <select name="eventType" defaultValue={policy.eventType} className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm">
+                  <option value="STALE_BASELINE">Stale baseline</option>
+                  <option value="FAILED_EXTRACTION">Failed extraction</option>
+                  <option value="DISPLAY_STALE_HEARTBEAT">Display stale heartbeat</option>
+                </select>
+                <select name="channel" defaultValue={policy.channel} className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm">
+                  <option value="EMAIL">Email</option>
+                  <option value="IN_APP">In app</option>
+                </select>
+                <input name="roleSlug" defaultValue={policy.roleSlug} className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm" />
+                <input name="escalationOrder" type="number" min="1" max="10" defaultValue={policy.escalationOrder} className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm" />
+                <input name="repeatMinutes" type="number" min="5" max="1440" defaultValue={policy.repeatMinutes} className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm" />
+                <label className="flex items-center gap-3 text-sm text-muted">
+                  <input type="checkbox" name="isActive" defaultChecked={policy.isActive} />
+                  Active
+                </label>
+                <button type="submit" className="justify-self-start rounded-full border border-line px-4 py-2 text-sm font-semibold">
+                  Update policy
+                </button>
+              </form>
+            ))}
           </div>
         </div>
       </section>

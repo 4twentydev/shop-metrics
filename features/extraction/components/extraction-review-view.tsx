@@ -11,6 +11,7 @@ import {
   startBulkExtractionAction,
   startReleaseExtractionAction,
 } from "@/features/extraction/actions";
+import { buildPlaybookFromDocumentKinds } from "@/features/extraction/triage-playbooks";
 import type { ExtractionReviewPageData } from "@/features/extraction/queries";
 import { formatNumber } from "@/lib/utils";
 
@@ -142,6 +143,9 @@ export function ExtractionReviewView({ data }: ExtractionReviewViewProps) {
         const handoffBatches = release.batches.filter(
           (batch) => batch.status === "HANDOFF_READY",
         );
+        const playbook = buildPlaybookFromDocumentKinds(
+          currentDocs.map((document) => document.kind),
+        );
         const reviewPayload = (latestReviewableRun?.reviewedOutput ??
           latestReviewableRun?.normalizedOutput) as
           | {
@@ -209,6 +213,9 @@ export function ExtractionReviewView({ data }: ExtractionReviewViewProps) {
                 </h2>
                 <p className="mt-2 text-sm text-muted">{release.productName}</p>
                 <p className="mt-2 text-sm text-muted">
+                  Playbook: <span className="font-semibold text-foreground">{playbook.label}</span>
+                </p>
+                <p className="mt-2 text-sm text-muted">
                   Queue state:{" "}
                   <span className="font-semibold text-foreground">
                     {release.queueState.replaceAll("_", " ")}
@@ -251,6 +258,11 @@ export function ExtractionReviewView({ data }: ExtractionReviewViewProps) {
                       <div key={document.id}>
                         {document.fileName} · {document.documentFamily} · {document.kind}
                       </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 space-y-2 text-sm text-muted">
+                    {playbook.checklist.map((item) => (
+                      <p key={item}>• {item}</p>
                     ))}
                   </div>
                 </div>

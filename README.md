@@ -24,6 +24,7 @@ Production foundation for a panel-centric manufacturing metrics platform built o
 - Reporting dashboards, configurable templates, and multi-format exports
 - Scheduled reporting operations, delivery history, and display-screen mode
 - Bulk extraction review, scheduled display playlists, notification delivery logs, and export archives
+- Delivery governance, retention cleanup, kiosk monitoring alerts, and extraction triage playbooks
 
 ## Architecture notes
 
@@ -174,6 +175,7 @@ Conditional:
 - SQL migration: [`drizzle/0007_export_storage.sql`](./drizzle/0007_export_storage.sql)
 - SQL migration: [`drizzle/0008_operational_hardening.sql`](./drizzle/0008_operational_hardening.sql)
 - SQL migration: [`drizzle/0009_bulk_review_notifications_archives.sql`](./drizzle/0009_bulk_review_notifications_archives.sql)
+- SQL migration: [`drizzle/0010_ops_governance.sql`](./drizzle/0010_ops_governance.sql)
 - Seed script: [`scripts/seed.ts`](./scripts/seed.ts)
 
 ## Work-entry routes
@@ -201,6 +203,7 @@ Conditional:
 - Display mode index: `/ops/reports/display`
 - Display mode by template: `/ops/reports/display/[templateSlug]`
 - Display playlist preview: `/ops/reports/display/playlists/[playlistSlug]`
+- Display monitoring: `/ops/reports/display/monitoring`
 - Public display index: `/display?access=DISPLAY_ACCESS_TOKEN`
 - Public display by template: `/display/[templateSlug]?access=DISPLAY_ACCESS_TOKEN`
 - Public display playlist: `/display/playlists/[playlistSlug]?access=DISPLAY_ACCESS_TOKEN`
@@ -216,6 +219,8 @@ Conditional:
 - Export bundles: `/api/reports/export/bundle`
 - Stored export download: `/api/reports/download/[deliveryId]`
 - Display heartbeat ingest: `/api/display/heartbeat`
+- Export retention cron: `/api/cron/export-retention`
+- Display monitoring cron: `/api/cron/display-monitoring`
 
 ## Release intake notes
 
@@ -235,6 +240,7 @@ Conditional:
 - Extraction preprocessing now orders document families by kind and injects document-type-specific guidance before Gemini sees the release packet.
 - Bulk extraction start and retry actions are available from the extraction queue for selected releases.
 - Bulk approval and rejection actions are available from the extraction queue, with triaged failure reasons stored on extraction runs.
+- Document-kind playbooks now guide review and bulk review is blocked across mixed document-family sets.
 - Extraction combines the release's current document set into one release-level summary.
 - AI output is never auto-approved. Reviewers edit fields first, then explicitly approve the baseline.
 - Revised uploads can keep a release in stale-baseline review until a reviewed extraction run is approved.
@@ -248,6 +254,7 @@ Conditional:
 - Leads verify in-flight work, leave comments, and see cross-department totals only on the lead route.
 - Active release-readiness notifications are surfaced on the lead work-entry route when stale baselines or failed extractions are blocking production.
 - Readiness blockers can now send deduplicated email notifications to ops/admin roles, with delivery rows persisted for auditability.
+- Notification preferences and escalation policies are configurable for release blockers and stale display heartbeats.
 - Submit-all locks the submission and all child entries.
 - Reopen requires a reason and is written to the audit log.
 - Entry edits are versioned and marked with editor and reason.
@@ -265,6 +272,9 @@ Conditional:
 - Formula coverage lives in [`tests/metrics/formulas.test.ts`](./tests/metrics/formulas.test.ts).
 
 ## Reporting notes
+- Export deliveries and artifacts now carry retention metadata and cleanup status for historical package governance.
+- Bundle downloads can be shared through signed retrieval links in addition to authenticated ops downloads.
+- Display monitoring persists stale-heartbeat alerts and exposes a dedicated monitoring route.
 
 - Report generation is centralized under [`features/reporting`](./features/reporting).
 - Saved templates are persisted in `report_templates` and support configurable summary/raw/pivot visibility.

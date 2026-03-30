@@ -8,6 +8,7 @@ import {
   recordReportDelivery,
   storeReportArtifact,
 } from "@/features/reporting/exports";
+import { calculateExpiry } from "@/features/reporting/retention";
 import { buildReportViewModel } from "@/features/reporting/service";
 import { exportRequestSchema } from "@/features/reporting/schemas";
 import { getSession } from "@/lib/auth/permissions";
@@ -103,6 +104,11 @@ export async function GET(request: NextRequest) {
           typeof artifact.body === "string"
             ? Buffer.byteLength(artifact.body)
             : artifact.body.byteLength,
+        retentionDays: 30,
+        expiresAt: calculateExpiry({
+          deliveredAt: new Date(),
+          retentionDays: 30,
+        }),
         manifestEntry: {
           dataset: parsed.dataset,
           format: parsed.format,

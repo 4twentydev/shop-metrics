@@ -16,6 +16,10 @@ import {
   startExtractionSchema,
 } from "@/features/extraction/schemas";
 import { preprocessReleaseDocuments } from "@/features/extraction/preprocessing";
+import {
+  buildDocumentFamilySignature,
+  buildPlaybookFromDocumentKinds,
+} from "@/features/extraction/triage-playbooks";
 import { syncReleaseReadinessNotifications } from "@/features/releases/readiness-notifications";
 import { writeAuditLog } from "@/lib/audit/log";
 import { requireOpsRole } from "@/lib/auth/permissions";
@@ -245,6 +249,78 @@ function readUuidList(formData: FormData, key: string) {
     .filter(Boolean);
 }
 
+async function loadRunDocuments(runIds: string[]) {
+  const runs = await db
+    .select()
+    .from(releaseExtractionRuns)
+    .where(inArray(releaseExtractionRuns.id, runIds));
+
+  const releaseIds = [...new Set(runs.map((run) => run.jobReleaseId))];
+  const documents =
+    releaseIds.length === 0
+      ? []
+      : await db
+          .select({
+            id: jobDocuments.id,
+            jobReleaseId: jobDocuments.jobReleaseId,
+            kind: jobDocuments.kind,
+            documentFamily: jobDocuments.documentFamily,
+            isCurrent: jobDocuments.isCurrent,
+          })
+          .from(jobDocuments)
+          .where(inArray(jobDocuments.jobReleaseId, releaseIds));
+
+  return runs.map((run) => ({
+    run,
+    documents: documents.filter((document) => document.jobReleaseId === run.jobReleaseId),
+  }));
+}
+
+async function assertBulkReviewGuardrails(input: {
+  runIds: string[];
+  mode: "APPROVE" | "REJECT";
+  failureReason?: string;
+}) {
+  const runSets = await loadRunDocuments(input.runIds);
+
+  if (runSets.length === 0) {
+    throw new Error("No extraction runs were selected.");
+  }
+
+  const signatures = runSets.map((item) =>
+    buildDocumentFamilySignature(
+      item.documents
+        .filter((document) => document.isCurrent)
+        .map((document) => ({
+          kind: document.kind,
+          documentFamily: document.documentFamily,
+        })),
+    ),
+  );
+
+  if (new Set(signatures).size > 1) {
+    throw new Error(
+      "Bulk review requires homogeneous document-family sets. Split selection by packet family first.",
+    );
+  }
+
+  const playbook = buildPlaybookFromDocumentKinds(
+    runSets[0]!.documents.filter((document) => document.isCurrent).map((document) => document.kind),
+  );
+
+  if (
+    input.mode === "REJECT" &&
+    input.failureReason &&
+    !playbook.allowedFailureReasons.includes(
+      input.failureReason as (typeof playbook.allowedFailureReasons)[number],
+    )
+  ) {
+    throw new Error(
+      `Bulk reject reason ${input.failureReason} is not allowed for ${playbook.label}.`,
+    );
+  }
+}
+
 export async function startBulkExtractionAction(formData: FormData) {
   const session = await requireOpsRole();
   const parsed = bulkExtractionSchema.parse({
@@ -309,6 +385,11 @@ export async function bulkApproveExtractionBaselinesAction(formData: FormData) {
   const session = await requireOpsRole();
   const parsed = bulkReviewSchema.parse({
     extractionRunIds: readUuidList(formData, "extractionRunIds"),
+  });
+
+  await assertBulkReviewGuardrails({
+    runIds: parsed.extractionRunIds,
+    mode: "APPROVE",
   });
 
   const runs = await db
@@ -456,6 +537,12 @@ export async function bulkRejectExtractionRunsAction(formData: FormData) {
     failureReason: formData.get("failureReason"),
     failureTriageNotes: readOptionalString(formData, "failureTriageNotes"),
     reviewerNotes: readOptionalString(formData, "reviewerNotes"),
+  });
+
+  await assertBulkReviewGuardrails({
+    runIds: parsed.extractionRunIds,
+    mode: "REJECT",
+    failureReason: parsed.failureReason,
   });
 
   const runs = await db

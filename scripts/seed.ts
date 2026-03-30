@@ -7,6 +7,7 @@ import {
   displayPlaylistItems,
   displayPlaylists,
   displayScreenHeartbeats,
+  displayAlerts,
   employeeStationAssignments,
   employees,
   jobDocuments,
@@ -14,7 +15,9 @@ import {
   jobs,
   metricTargets,
   metricTargetVersions,
+  notificationEscalationPolicies,
   notificationDeliveries,
+  notificationPreferences,
   reportExportDeliveries,
   reportExportArtifacts,
   reportTemplateVersions,
@@ -1311,6 +1314,9 @@ async function main() {
       primaryContentType: "text/csv; charset=utf-8",
       byteSize: 512,
       rowCount: 4,
+      retentionDays: 30,
+      expiresAt: new Date("2026-04-28T00:00:00.000Z"),
+      cleanupStatus: "ACTIVE",
       requestedByUserId: "usr_ops_lead",
       deliveredAt: now,
     })
@@ -1344,6 +1350,9 @@ async function main() {
       storageKey: "report-exports/rework/weekly/2026-03-23/rework-weekly-2026-03-23-bundle.tar",
       byteSize: 4096,
       rowCount: 4,
+      retentionDays: 90,
+      expiresAt: new Date("2026-06-27T00:00:00.000Z"),
+      cleanupStatus: "ACTIVE",
       requestedByUserId: "usr_ops_lead",
       deliveredAt: now,
     })
@@ -1376,6 +1385,9 @@ async function main() {
           checksumSha256:
             "de46d6b8d73f4cf142b71f22bcaa4fbfef4d4f1bdd1bcd0ab6f79edcc8dcf12a",
           byteSize: 4096,
+          retentionDays: 90,
+          expiresAt: new Date("2026-06-27T00:00:00.000Z"),
+          cleanupStatus: "ACTIVE",
           manifestEntry: {
             type: "bundle",
           },
@@ -1393,6 +1405,9 @@ async function main() {
           checksumSha256:
             "ee46d6b8d73f4cf142b71f22bcaa4fbfef4d4f1bdd1bcd0ab6f79edcc8dcf12a",
           byteSize: 1024,
+          retentionDays: 90,
+          expiresAt: new Date("2026-06-27T00:00:00.000Z"),
+          cleanupStatus: "ACTIVE",
           manifestEntry: {
             dataset: "summary",
             format: "csv",
@@ -1441,6 +1456,7 @@ async function main() {
       .insert(notificationDeliveries)
       .values(
         readinessRows.map((notification) => ({
+          eventType: notification.notificationType,
           readinessNotificationId: notification.id,
           channel: "EMAIL" as const,
           recipient: "avery.chen@elwardsystems.example",
@@ -1456,6 +1472,86 @@ async function main() {
       .onConflictDoNothing();
   }
 
+  await db
+    .insert(notificationEscalationPolicies)
+    .values([
+      {
+        eventType: "STALE_BASELINE",
+        channel: "EMAIL",
+        roleSlug: "ops_lead",
+        escalationOrder: 1,
+        repeatMinutes: 60,
+        isActive: true,
+        createdByUserId: "usr_admin_elward",
+        updatedByUserId: "usr_admin_elward",
+      },
+      {
+        eventType: "FAILED_EXTRACTION",
+        channel: "EMAIL",
+        roleSlug: "platform_admin",
+        escalationOrder: 1,
+        repeatMinutes: 60,
+        isActive: true,
+        createdByUserId: "usr_admin_elward",
+        updatedByUserId: "usr_admin_elward",
+      },
+      {
+        eventType: "DISPLAY_STALE_HEARTBEAT",
+        channel: "EMAIL",
+        roleSlug: "platform_admin",
+        escalationOrder: 1,
+        repeatMinutes: 30,
+        isActive: true,
+        createdByUserId: "usr_admin_elward",
+        updatedByUserId: "usr_admin_elward",
+      },
+    ])
+    .onConflictDoNothing();
+
+  await db
+    .insert(notificationPreferences)
+    .values([
+      {
+        userId: "usr_ops_lead",
+        eventType: "STALE_BASELINE",
+        channel: "EMAIL",
+        isEnabled: true,
+        minimumRepeatMinutes: 45,
+        updatedByUserId: "usr_admin_elward",
+      },
+      {
+        userId: "usr_department_lead",
+        eventType: "DISPLAY_STALE_HEARTBEAT",
+        channel: "EMAIL",
+        isEnabled: false,
+        minimumRepeatMinutes: 30,
+        updatedByUserId: "usr_admin_elward",
+      },
+    ])
+    .onConflictDoNothing();
+
+  const seededHeartbeat = await db.query.displayScreenHeartbeats.findFirst({
+    where: eq(displayScreenHeartbeats.screenKey, "shop-floor-east-wall"),
+  });
+
+  if (seededHeartbeat) {
+    await db
+      .insert(displayAlerts)
+      .values({
+        playlistId: seededHeartbeat.playlistId ?? null,
+        screenHeartbeatId: seededHeartbeat.id,
+        alertType: "STALE_HEARTBEAT",
+        status: "ACTIVE",
+        message: "Display Shop Floor East Wall heartbeat is stale.",
+        detectedAt: now,
+        lastEvaluatedAt: now,
+        metadata: {
+          source: "seed",
+        },
+      })
+      .onConflictDoNothing();
+  }
+
   await db.insert(auditLogs).values({
     actorUserId: "usr_admin_elward",
     action: "seed.completed",
@@ -1464,7 +1560,7 @@ async function main() {
       metadata: {
         users: seededUsers.length,
         departments: 6,
-        version: 9,
+        version: 10,
       },
   });
 

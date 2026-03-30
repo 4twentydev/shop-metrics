@@ -1,97 +1,77 @@
 import "server-only";
 
-import { and, eq, inArray } from "drizzle-orm";
-import { Resend } from "resend";
+import { eq } from "drizzle-orm";
 
+import {
+  resolveNotificationRecipients,
+  sendEmailNotification,
+  shouldSendNotification,
+} from "@/features/governance/notifications";
 import { db } from "@/lib/db";
 import {
   jobReleases,
   jobs,
   notificationDeliveries,
   releaseReadinessNotifications,
-  users,
 } from "@/lib/db/schema";
 import { env } from "@/lib/env";
 
-const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
-
 export async function deliverReadinessNotifications() {
-  const [notifications, recipients] = await Promise.all([
-    db
-      .select({
-        id: releaseReadinessNotifications.id,
-        message: releaseReadinessNotifications.message,
-        notificationType: releaseReadinessNotifications.notificationType,
-        jobReleaseId: releaseReadinessNotifications.jobReleaseId,
-        releaseCode: jobReleases.releaseCode,
-        jobNumber: jobs.jobNumber,
-      })
-      .from(releaseReadinessNotifications)
-      .innerJoin(jobReleases, eq(releaseReadinessNotifications.jobReleaseId, jobReleases.id))
-      .innerJoin(jobs, eq(jobReleases.jobId, jobs.id))
-      .where(eq(releaseReadinessNotifications.status, "ACTIVE")),
-    db
-      .select({
-        id: users.id,
-        email: users.email,
-        name: users.name,
-      })
-      .from(users)
-      .where(
-        and(
-          eq(users.status, "ACTIVE"),
-          inArray(users.activeRole, [
-            "platform_admin",
-            "ops_lead",
-            "department_lead",
-          ]),
-        ),
-      ),
-  ]);
+  const notifications = await db
+    .select({
+      id: releaseReadinessNotifications.id,
+      message: releaseReadinessNotifications.message,
+      notificationType: releaseReadinessNotifications.notificationType,
+      jobReleaseId: releaseReadinessNotifications.jobReleaseId,
+      releaseCode: jobReleases.releaseCode,
+      jobNumber: jobs.jobNumber,
+    })
+    .from(releaseReadinessNotifications)
+    .innerJoin(jobReleases, eq(releaseReadinessNotifications.jobReleaseId, jobReleases.id))
+    .innerJoin(jobs, eq(jobReleases.jobId, jobs.id))
+    .where(eq(releaseReadinessNotifications.status, "ACTIVE"));
 
   for (const notification of notifications) {
+    const recipients = await resolveNotificationRecipients({
+      eventType: notification.notificationType,
+      channel: "EMAIL",
+    });
+
     for (const recipient of recipients) {
-      const [delivery] = await db
+      const shouldSend = await shouldSendNotification({
+        eventType: notification.notificationType,
+        channel: "EMAIL",
+        recipient: recipient.email,
+        readinessNotificationId: notification.id,
+        repeatMinutes: recipient.repeatMinutes,
+      });
+
+      if (!shouldSend) {
+        continue;
+      }
+
+      const delivery = await db
         .insert(notificationDeliveries)
         .values({
+          eventType: notification.notificationType,
           readinessNotificationId: notification.id,
           channel: "EMAIL",
           recipient: recipient.email,
           status: "PENDING",
-          provider: resend ? "resend" : "console",
+          provider: "pending",
           metadata: {
             recipientName: recipient.name,
-            notificationType: notification.notificationType,
+            escalationOrder: recipient.escalationOrder,
           },
         })
-        .onConflictDoNothing()
         .returning({
           id: notificationDeliveries.id,
         });
 
-      if (!delivery) {
-        continue;
-      }
-
       try {
         const releaseUrl = `${env.APP_URL}/ops/releases/admin/${notification.jobReleaseId}`;
-        if (!resend) {
-          console.info(
-            `[readiness] ${recipient.email}: ${notification.message} (${releaseUrl})`,
-          );
-          await db
-            .update(notificationDeliveries)
-            .set({
-              status: "SENT",
-              sentAt: new Date(),
-            })
-            .where(eq(notificationDeliveries.id, delivery.id));
-          continue;
-        }
-
-        const response = await resend.emails.send({
-          from: env.AUTH_FROM_EMAIL,
-          to: recipient.email,
+        const sent = await sendEmailNotification({
+          recipient: recipient.email,
           subject: `Release blocked: ${notification.jobNumber} ${notification.releaseCode}`,
           html: `
             <p>${notification.message}</p>
@@ -104,11 +84,11 @@ export async function deliverReadinessNotifications() {
           .update(notificationDeliveries)
           .set({
             status: "SENT",
-            providerMessageId:
-              "data" in response && response.data ? response.data.id ?? null : null,
+            provider: sent.provider,
+            providerMessageId: sent.providerMessageId,
             sentAt: new Date(),
           })
-          .where(eq(notificationDeliveries.id, delivery.id));
+          .where(eq(notificationDeliveries.id, delivery[0]!.id));
       } catch (error) {
         await db
           .update(notificationDeliveries)
@@ -116,7 +96,7 @@ export async function deliverReadinessNotifications() {
             status: "FAILED",
             errorMessage: error instanceof Error ? error.message : "Unknown delivery error.",
           })
-          .where(eq(notificationDeliveries.id, delivery.id));
+          .where(eq(notificationDeliveries.id, delivery[0]!.id));
       }
     }
   }
