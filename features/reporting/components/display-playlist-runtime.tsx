@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 
 type DisplayPlaylistRuntimeProps = {
@@ -98,7 +99,7 @@ export function DisplayPlaylistRuntime({
         params.set("anchorDate", anchorDate);
       }
 
-      router.replace(`${basePath}/${playlistSlug}?${params.toString()}`);
+      router.replace(`${basePath}/${playlistSlug}?${params.toString()}` as Route);
     }, rotationSeconds * 1000);
 
     return () => window.clearTimeout(rotateHandle);
