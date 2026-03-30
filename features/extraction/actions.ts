@@ -209,7 +209,9 @@ export async function startReleaseExtractionAction(formData: FormData) {
 
   await runExtraction({
     jobReleaseId: parsed.jobReleaseId,
-    intakeBatchId: parsed.intakeBatchId,
+    ...(parsed.intakeBatchId !== undefined && {
+      intakeBatchId: parsed.intakeBatchId,
+    }),
     createdByUserId: session.user.id,
   });
 
