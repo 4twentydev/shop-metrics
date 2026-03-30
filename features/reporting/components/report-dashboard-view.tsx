@@ -27,7 +27,7 @@ function ExportLink({
 }) {
   return (
     <Link
-      href={href}
+      href={href as `/${string}`}
       className="rounded-full border border-line px-4 py-2 text-sm font-semibold transition hover:border-accent"
     >
       {label}
