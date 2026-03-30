@@ -50,7 +50,7 @@ export default async function SignInPage({
             </div>
           </div>
         </section>
-        <SignInPanel initialError={error} />
+        <SignInPanel {...(error !== undefined ? { initialError: error } : {})} />
       </div>
     </main>
   );
