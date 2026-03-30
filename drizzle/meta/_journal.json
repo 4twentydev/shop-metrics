@@ -64,6 +64,13 @@
       "when": 1774872000000,
       "tag": "0008_operational_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1774875600000,
+      "tag": "0009_bulk_review_notifications_archives",
+      "breakpoints": true
     }
   ]
 }

@@ -6,8 +6,11 @@ import { revalidatePath } from "next/cache";
 import { extractReleaseSummaryWithGemini } from "@/features/extraction/gemini-service";
 import { releaseExtractionSummarySchema } from "@/features/extraction/normalization";
 import {
+  bulkReviewSchema,
   bulkExtractionSchema,
+  extractionFailureReasonSchema,
   readOptionalString,
+  rejectExtractionSchema,
   retryExtractionSchema,
   reviewExtractionSchema,
   startExtractionSchema,
@@ -24,6 +27,37 @@ import {
   releaseIntakeBatches,
 } from "@/lib/db/schema";
 import { env } from "@/lib/env";
+
+function inferFailureReason(error: unknown) {
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : "unknown extraction failure";
+
+  if (message.includes("timeout")) {
+    return "TIMEOUT" as const;
+  }
+
+  if (message.includes("document") || message.includes("no current documents")) {
+    return "DOCUMENT_SET_INVALID" as const;
+  }
+
+  if (message.includes("json") || message.includes("schema")) {
+    return "NORMALIZATION_ERROR" as const;
+  }
+
+  if (message.includes("ocr")) {
+    return "OCR_QUALITY" as const;
+  }
+
+  if (message.includes("review")) {
+    return "HUMAN_REVIEW_REQUIRED" as const;
+  }
+
+  if (message.includes("gemini") || message.includes("model")) {
+    return "MODEL_FAILURE" as const;
+  }
+
+  return "UNKNOWN" as const;
+}
 
 async function runExtraction(input: {
   jobReleaseId: string;
@@ -133,6 +167,7 @@ async function runExtraction(input: {
       .update(releaseExtractionRuns)
       .set({
         status: "FAILED",
+        failureReason: inferFailureReason(error),
         errorMessage: error instanceof Error ? error.message : "Unknown extraction failure.",
         completedAt: new Date(),
       })
@@ -270,6 +305,219 @@ export async function retryBulkExtractionAction(formData: FormData) {
   revalidatePath("/ops/releases/extraction");
 }
 
+export async function bulkApproveExtractionBaselinesAction(formData: FormData) {
+  const session = await requireOpsRole();
+  const parsed = bulkReviewSchema.parse({
+    extractionRunIds: readUuidList(formData, "extractionRunIds"),
+  });
+
+  const runs = await db
+    .select()
+    .from(releaseExtractionRuns)
+    .where(inArray(releaseExtractionRuns.id, parsed.extractionRunIds));
+
+  for (const run of runs) {
+    if (run.status !== "SUCCEEDED" || !run.reviewedOutput) {
+      continue;
+    }
+
+    const reviewed = run.reviewedOutput as {
+      summary: {
+        expectedPanels: number;
+      };
+    };
+
+    await db
+      .update(releaseExtractionRuns)
+      .set({
+        reviewStatus: "APPROVED",
+        failureReason: null,
+        failureTriageNotes: null,
+        reviewedByUserId: session.user.id,
+        reviewedAt: new Date(),
+        approvedAt: new Date(),
+        rejectedAt: null,
+        reviewerNotes: parsed.reviewerNotes ?? run.reviewerNotes,
+      })
+      .where(eq(releaseExtractionRuns.id, run.id));
+
+    await db
+      .update(jobReleases)
+      .set({
+        panelBaseline: reviewed.summary.expectedPanels.toFixed(2),
+        baselineApprovedAt: new Date(),
+        baselineApprovedByUserId: session.user.id,
+        baselineApprovedExtractionRunId: run.id,
+        baselineStaleAt: null,
+        baselineStaleReason: null,
+        baselineStaleSourceBatchId: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(jobReleases.id, run.jobReleaseId));
+
+    await db
+      .update(jobDocuments)
+      .set({
+        extractionStatus: "REVIEWED",
+      })
+      .where(inArray(jobDocuments.id, run.sourceDocumentIds as string[]));
+  }
+
+  await writeAuditLog({
+    actorUserId: session.user.id,
+    action: "release-extraction.bulk-approved",
+    entityType: "release_extraction_queue",
+    entityId: parsed.extractionRunIds.join(","),
+    metadata: {
+      extractionRunCount: parsed.extractionRunIds.length,
+    },
+  });
+
+  await syncReleaseReadinessNotifications();
+  revalidatePath("/ops/releases/extraction");
+  revalidatePath("/ops/releases/intake");
+}
+
+export async function rejectExtractionRunAction(formData: FormData) {
+  const session = await requireOpsRole();
+  const parsed = rejectExtractionSchema.parse({
+    extractionRunId: formData.get("extractionRunId"),
+    failureReason: formData.get("failureReason"),
+    failureTriageNotes: readOptionalString(formData, "failureTriageNotes"),
+    reviewerNotes: readOptionalString(formData, "reviewerNotes"),
+  });
+
+  const run = await db.query.releaseExtractionRuns.findFirst({
+    where: eq(releaseExtractionRuns.id, parsed.extractionRunId),
+  });
+
+  if (!run) {
+    throw new Error("Extraction run not found.");
+  }
+
+  const release = await db.query.jobReleases.findFirst({
+    where: eq(jobReleases.id, run.jobReleaseId),
+  });
+
+  await db
+    .update(releaseExtractionRuns)
+    .set({
+      reviewStatus: "REJECTED",
+      failureReason: parsed.failureReason,
+      failureTriageNotes: parsed.failureTriageNotes ?? null,
+      reviewerNotes: parsed.reviewerNotes ?? null,
+      reviewedByUserId: session.user.id,
+      reviewedAt: new Date(),
+      approvedAt: null,
+      rejectedAt: new Date(),
+    })
+    .where(eq(releaseExtractionRuns.id, run.id));
+
+  await db
+    .update(jobDocuments)
+    .set({
+      extractionStatus: "REJECTED",
+    })
+    .where(inArray(jobDocuments.id, run.sourceDocumentIds as string[]));
+
+  if (release?.baselineApprovedExtractionRunId === run.id) {
+    await db
+      .update(jobReleases)
+      .set({
+        baselineStaleAt: new Date(),
+        baselineStaleReason: "Approved extraction run was rejected during review triage.",
+        updatedAt: new Date(),
+      })
+      .where(eq(jobReleases.id, run.jobReleaseId));
+  }
+
+  await writeAuditLog({
+    actorUserId: session.user.id,
+    action: "release-extraction.rejected",
+    entityType: "release_extraction_run",
+    entityId: run.id,
+    metadata: {
+      jobReleaseId: run.jobReleaseId,
+      failureReason: parsed.failureReason,
+      failureTriageNotes: parsed.failureTriageNotes ?? null,
+    },
+  });
+
+  await syncReleaseReadinessNotifications();
+  revalidatePath("/ops/releases/extraction");
+}
+
+export async function bulkRejectExtractionRunsAction(formData: FormData) {
+  const session = await requireOpsRole();
+  const parsed = bulkReviewSchema.extend({
+    failureReason: extractionFailureReasonSchema,
+  }).parse({
+    extractionRunIds: readUuidList(formData, "extractionRunIds"),
+    failureReason: formData.get("failureReason"),
+    failureTriageNotes: readOptionalString(formData, "failureTriageNotes"),
+    reviewerNotes: readOptionalString(formData, "reviewerNotes"),
+  });
+
+  const runs = await db
+    .select()
+    .from(releaseExtractionRuns)
+    .where(inArray(releaseExtractionRuns.id, parsed.extractionRunIds));
+
+  const releases = await db
+    .select()
+    .from(jobReleases)
+    .where(inArray(jobReleases.id, runs.map((run) => run.jobReleaseId)));
+
+  for (const run of runs) {
+    await db
+      .update(releaseExtractionRuns)
+      .set({
+        reviewStatus: "REJECTED",
+        failureReason: parsed.failureReason,
+        failureTriageNotes: parsed.failureTriageNotes ?? null,
+        reviewerNotes: parsed.reviewerNotes ?? null,
+        reviewedByUserId: session.user.id,
+        reviewedAt: new Date(),
+        approvedAt: null,
+        rejectedAt: new Date(),
+      })
+      .where(eq(releaseExtractionRuns.id, run.id));
+
+    await db
+      .update(jobDocuments)
+      .set({
+        extractionStatus: "REJECTED",
+      })
+      .where(inArray(jobDocuments.id, run.sourceDocumentIds as string[]));
+
+    const release = releases.find((item) => item.id === run.jobReleaseId);
+    if (release?.baselineApprovedExtractionRunId === run.id) {
+      await db
+        .update(jobReleases)
+        .set({
+          baselineStaleAt: new Date(),
+          baselineStaleReason: "Approved extraction run was rejected during bulk review triage.",
+          updatedAt: new Date(),
+        })
+        .where(eq(jobReleases.id, run.jobReleaseId));
+    }
+  }
+
+  await writeAuditLog({
+    actorUserId: session.user.id,
+    action: "release-extraction.bulk-rejected",
+    entityType: "release_extraction_queue",
+    entityId: parsed.extractionRunIds.join(","),
+    metadata: {
+      extractionRunCount: parsed.extractionRunIds.length,
+      failureReason: parsed.failureReason,
+    },
+  });
+
+  await syncReleaseReadinessNotifications();
+  revalidatePath("/ops/releases/extraction");
+}
+
 export async function saveExtractionReviewAction(formData: FormData) {
   const session = await requireOpsRole();
   const parsed = reviewExtractionSchema.parse({
@@ -320,10 +568,13 @@ export async function saveExtractionReviewAction(formData: FormData) {
     .update(releaseExtractionRuns)
     .set({
       reviewedOutput,
+      failureReason: null,
+      failureTriageNotes: null,
       reviewerNotes: parsed.reviewerNotes ?? null,
       reviewedByUserId: session.user.id,
       reviewedAt: new Date(),
       reviewStatus: "PENDING_REVIEW",
+      rejectedAt: null,
     })
     .where(eq(releaseExtractionRuns.id, run.id));
 
@@ -363,9 +614,12 @@ export async function approveExtractionBaselineAction(formData: FormData) {
     .update(releaseExtractionRuns)
     .set({
       reviewStatus: "APPROVED",
+      failureReason: null,
+      failureTriageNotes: null,
       reviewedByUserId: session.user.id,
       reviewedAt: new Date(),
       approvedAt: new Date(),
+      rejectedAt: null,
     })
     .where(eq(releaseExtractionRuns.id, run.id));
 

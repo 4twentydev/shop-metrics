@@ -14,7 +14,9 @@ import {
   jobs,
   metricTargets,
   metricTargetVersions,
+  notificationDeliveries,
   reportExportDeliveries,
+  reportExportArtifacts,
   reportTemplateVersions,
   reportTemplates,
   releaseComments,
@@ -1236,6 +1238,9 @@ async function main() {
         description: "Rotates executive and rework views for the production wallboard.",
         rotationSeconds: 25,
         heartbeatIntervalSeconds: 60,
+        shiftId: dayShift.id,
+        startsAtLocal: "06:00:00",
+        endsAtLocal: "18:00:00",
         isActive: true,
         createdByUserId: "usr_admin_elward",
         updatedByUserId: "usr_admin_elward",
@@ -1311,6 +1316,92 @@ async function main() {
     })
     .onConflictDoNothing();
 
+  const bundleDelivery = await db
+    .insert(reportExportDeliveries)
+    .values({
+      reportView: "REWORK",
+      windowType: "WEEKLY",
+      windowStart: "2026-03-23",
+      windowEnd: "2026-03-29",
+      scopeType: "COMPANY",
+      scopeKey: "ELWARD_SYSTEMS",
+      packageType: "BUNDLE",
+      requestedFormats: ["csv", "pdf"],
+      requestedDatasets: ["summary", "pivot"],
+      packageManifest: {
+        source: "seed",
+        route: "/api/reports/export/bundle",
+        members: [
+          "rework-weekly-summary.csv",
+          "rework-weekly-summary.pdf",
+          "rework-weekly-pivot.csv",
+          "rework-weekly-pivot.pdf",
+        ],
+      },
+      primaryFileName: "rework-weekly-2026-03-23-bundle.tar",
+      primaryContentType: "application/x-tar",
+      storageProvider: "local",
+      storageKey: "report-exports/rework/weekly/2026-03-23/rework-weekly-2026-03-23-bundle.tar",
+      byteSize: 4096,
+      rowCount: 4,
+      requestedByUserId: "usr_ops_lead",
+      deliveredAt: now,
+    })
+    .onConflictDoNothing()
+    .returning({ id: reportExportDeliveries.id });
+
+  const bundleDeliveryId =
+    bundleDelivery[0]?.id ??
+    (
+      await db.query.reportExportDeliveries.findFirst({
+        where: eq(
+          reportExportDeliveries.primaryFileName,
+          "rework-weekly-2026-03-23-bundle.tar",
+        ),
+      })
+    )?.id;
+
+  if (bundleDeliveryId) {
+    await db
+      .insert(reportExportArtifacts)
+      .values([
+        {
+          deliveryId: bundleDeliveryId,
+          artifactType: "PRIMARY",
+          fileName: "rework-weekly-2026-03-23-bundle.tar",
+          contentType: "application/x-tar",
+          storageProvider: "local",
+          storageKey:
+            "report-exports/rework/weekly/2026-03-23/rework-weekly-2026-03-23-bundle.tar",
+          checksumSha256:
+            "de46d6b8d73f4cf142b71f22bcaa4fbfef4d4f1bdd1bcd0ab6f79edcc8dcf12a",
+          byteSize: 4096,
+          manifestEntry: {
+            type: "bundle",
+          },
+        },
+        {
+          deliveryId: bundleDeliveryId,
+          artifactType: "BUNDLE_MEMBER",
+          dataset: "summary",
+          format: "csv",
+          fileName: "rework-weekly-summary.csv",
+          contentType: "text/csv; charset=utf-8",
+          storageProvider: "local",
+          storageKey:
+            "report-exports/rework/weekly/2026-03-23/rework-weekly-summary.csv",
+          checksumSha256:
+            "ee46d6b8d73f4cf142b71f22bcaa4fbfef4d4f1bdd1bcd0ab6f79edcc8dcf12a",
+          byteSize: 1024,
+          manifestEntry: {
+            dataset: "summary",
+            format: "csv",
+          },
+        },
+      ])
+      .onConflictDoNothing();
+  }
+
   await db
     .insert(releaseReadinessNotifications)
     .values([
@@ -1341,6 +1432,30 @@ async function main() {
     ])
     .onConflictDoNothing();
 
+  const readinessRows = await db.query.releaseReadinessNotifications.findMany({
+    where: eq(releaseReadinessNotifications.status, "ACTIVE"),
+  });
+
+  if (readinessRows.length > 0) {
+    await db
+      .insert(notificationDeliveries)
+      .values(
+        readinessRows.map((notification) => ({
+          readinessNotificationId: notification.id,
+          channel: "EMAIL" as const,
+          recipient: "avery.chen@elwardsystems.example",
+          status: "SENT" as const,
+          provider: "seed",
+          providerMessageId: `seed-${notification.notificationType.toLowerCase()}`,
+          sentAt: now,
+          metadata: {
+            source: "seed",
+          },
+        })),
+      )
+      .onConflictDoNothing();
+  }
+
   await db.insert(auditLogs).values({
     actorUserId: "usr_admin_elward",
     action: "seed.completed",
@@ -1349,7 +1464,7 @@ async function main() {
       metadata: {
         users: seededUsers.length,
         departments: 6,
-        version: 8,
+        version: 9,
       },
   });
 

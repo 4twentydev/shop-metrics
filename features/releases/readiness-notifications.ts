@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, desc, eq, inArray } from "drizzle-orm";
 
+import { deliverReadinessNotifications } from "@/features/releases/notification-delivery";
 import { db } from "@/lib/db";
 import {
   jobDocuments,
@@ -161,6 +162,8 @@ export async function syncReleaseReadinessNotifications() {
         .where(eq(releaseReadinessNotifications.id, notification.id));
     }
   }
+
+  await deliverReadinessNotifications();
 }
 
 export async function getActiveReadinessNotifications() {

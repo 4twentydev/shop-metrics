@@ -4,10 +4,12 @@ import { and, asc, desc, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import {
+  departments,
   displayPlaylistItems,
   displayPlaylists,
   displayScreenHeartbeats,
   reportTemplates,
+  shifts,
 } from "@/lib/db/schema";
 
 export async function getDisplayPlaylists() {
@@ -19,9 +21,15 @@ export async function getDisplayPlaylists() {
       description: displayPlaylists.description,
       rotationSeconds: displayPlaylists.rotationSeconds,
       heartbeatIntervalSeconds: displayPlaylists.heartbeatIntervalSeconds,
+      departmentCode: departments.code,
+      shiftCode: shifts.code,
+      startsAtLocal: displayPlaylists.startsAtLocal,
+      endsAtLocal: displayPlaylists.endsAtLocal,
       isActive: displayPlaylists.isActive,
     })
     .from(displayPlaylists)
+    .leftJoin(departments, eq(displayPlaylists.departmentId, departments.id))
+    .leftJoin(shifts, eq(displayPlaylists.shiftId, shifts.id))
     .orderBy(asc(displayPlaylists.name));
 
   const items = await db
@@ -43,9 +51,17 @@ export async function getDisplayPlaylists() {
   }));
 }
 
-export async function getDisplayPlaylistBySlug(slug: string) {
+export async function getDisplayPlaylistBySlug(
+  slug: string,
+  options?: {
+    includeInactive?: boolean;
+  },
+) {
   const playlist = await db.query.displayPlaylists.findFirst({
-    where: and(eq(displayPlaylists.slug, slug), eq(displayPlaylists.isActive, true)),
+    where:
+      options?.includeInactive
+        ? eq(displayPlaylists.slug, slug)
+        : and(eq(displayPlaylists.slug, slug), eq(displayPlaylists.isActive, true)),
   });
 
   if (!playlist) {
@@ -77,6 +93,53 @@ export async function getDisplayPlaylistBySlug(slug: string) {
     ...playlist,
     items,
   };
+}
+
+export async function getScheduledDisplayPlaylist(input: {
+  departmentCode?: string | null;
+  shiftCode?: string | null;
+}) {
+  const rows = await db
+    .select({
+      id: displayPlaylists.id,
+      name: displayPlaylists.name,
+      slug: displayPlaylists.slug,
+      description: displayPlaylists.description,
+      rotationSeconds: displayPlaylists.rotationSeconds,
+      heartbeatIntervalSeconds: displayPlaylists.heartbeatIntervalSeconds,
+      departmentCode: departments.code,
+      shiftCode: shifts.code,
+      startsAtLocal: displayPlaylists.startsAtLocal,
+      endsAtLocal: displayPlaylists.endsAtLocal,
+      isActive: displayPlaylists.isActive,
+    })
+    .from(displayPlaylists)
+    .leftJoin(departments, eq(displayPlaylists.departmentId, departments.id))
+    .leftJoin(shifts, eq(displayPlaylists.shiftId, shifts.id))
+    .where(eq(displayPlaylists.isActive, true))
+    .orderBy(
+      asc(displayPlaylists.departmentId),
+      asc(displayPlaylists.shiftId),
+      asc(displayPlaylists.name),
+    );
+
+  const departmentMatch =
+    rows.find(
+      (row) =>
+        row.departmentCode === (input.departmentCode ?? null) &&
+        row.shiftCode === (input.shiftCode ?? null),
+    ) ??
+    rows.find(
+      (row) =>
+        row.departmentCode === (input.departmentCode ?? null) && row.shiftCode === null,
+    ) ??
+    rows.find(
+      (row) =>
+        row.departmentCode === null && row.shiftCode === (input.shiftCode ?? null),
+    ) ??
+    rows.find((row) => row.departmentCode === null && row.shiftCode === null);
+
+  return departmentMatch ?? null;
 }
 
 export async function getDisplayHeartbeatAdminData() {

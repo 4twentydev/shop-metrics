@@ -26,6 +26,30 @@ export const bulkExtractionSchema = z.object({
   jobReleaseIds: z.array(z.string().uuid()).min(1).max(50),
 });
 
+export const extractionFailureReasonSchema = z.enum([
+  "DOCUMENT_SET_INVALID",
+  "OCR_QUALITY",
+  "MODEL_FAILURE",
+  "NORMALIZATION_ERROR",
+  "TIMEOUT",
+  "HUMAN_REVIEW_REQUIRED",
+  "UNKNOWN",
+]);
+
+export const rejectExtractionSchema = z.object({
+  extractionRunId: z.string().uuid(),
+  failureReason: extractionFailureReasonSchema,
+  failureTriageNotes: z.string().trim().max(1000).optional(),
+  reviewerNotes: z.string().trim().max(1000).optional(),
+});
+
+export const bulkReviewSchema = z.object({
+  extractionRunIds: z.array(z.string().uuid()).min(1).max(50),
+  failureReason: extractionFailureReasonSchema.optional(),
+  failureTriageNotes: z.string().trim().max(1000).optional(),
+  reviewerNotes: z.string().trim().max(1000).optional(),
+});
+
 export const extractionQueueFilterSchema = z
   .enum([
     "ALL",

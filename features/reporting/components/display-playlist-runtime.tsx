@@ -7,6 +7,7 @@ type DisplayPlaylistRuntimeProps = {
   playlistId: string;
   playlistSlug: string;
   accessToken: string;
+  basePath?: string;
   screenKey: string;
   screenLabel: string;
   currentIndex: number;
@@ -21,6 +22,7 @@ export function DisplayPlaylistRuntime({
   playlistId,
   playlistSlug,
   accessToken,
+  basePath = "/display/playlists",
   screenKey,
   screenLabel,
   currentIndex,
@@ -33,6 +35,10 @@ export function DisplayPlaylistRuntime({
   const router = useRouter();
 
   useEffect(() => {
+    if (!accessToken) {
+      return;
+    }
+
     const heartbeat = () => {
       void fetch("/api/display/heartbeat", {
         method: "POST",
@@ -45,7 +51,7 @@ export function DisplayPlaylistRuntime({
           screenKey,
           screenLabel,
           templateSlug: currentTemplateSlug,
-          path: `/display/playlists/${playlistSlug}`,
+          path: `${basePath}/${playlistSlug}`,
           anchorDate: anchorDate ?? null,
         }),
       });
@@ -61,6 +67,7 @@ export function DisplayPlaylistRuntime({
   }, [
     accessToken,
     anchorDate,
+    basePath,
     currentTemplateSlug,
     heartbeatIntervalSeconds,
     playlistId,
@@ -77,23 +84,27 @@ export function DisplayPlaylistRuntime({
     const rotateHandle = window.setTimeout(() => {
       const nextIndex = (currentIndex + 1) % totalItems;
       const params = new URLSearchParams({
-        access: accessToken,
         step: String(nextIndex),
         screen: screenKey,
         label: screenLabel,
       });
 
+      if (accessToken) {
+        params.set("access", accessToken);
+      }
+
       if (anchorDate) {
         params.set("anchorDate", anchorDate);
       }
 
-      router.replace(`/display/playlists/${playlistSlug}?${params.toString()}`);
+      router.replace(`${basePath}/${playlistSlug}?${params.toString()}`);
     }, rotationSeconds * 1000);
 
     return () => window.clearTimeout(rotateHandle);
   }, [
     accessToken,
     anchorDate,
+    basePath,
     currentIndex,
     playlistSlug,
     rotationSeconds,

@@ -2,8 +2,12 @@ import { NextRequest } from "next/server";
 
 import { createHash } from "node:crypto";
 
-import { buildExportArtifact, recordReportDelivery } from "@/features/reporting/exports";
-import { storeReportArtifact } from "@/features/reporting/exports";
+import {
+  buildExportArtifact,
+  recordReportArtifacts,
+  recordReportDelivery,
+  storeReportArtifact,
+} from "@/features/reporting/exports";
 import { buildReportViewModel } from "@/features/reporting/service";
 import { exportRequestSchema } from "@/features/reporting/schemas";
 import { getSession } from "@/lib/auth/permissions";
@@ -54,7 +58,7 @@ export async function GET(request: NextRequest) {
     windowStart: report.range.windowStart,
   });
 
-  await recordReportDelivery({
+  const delivery = await recordReportDelivery({
     report,
     templateId: parsed.templateId ?? null,
     packageType: "SINGLE",
@@ -80,6 +84,31 @@ export async function GET(request: NextRequest) {
       format: parsed.format,
     },
     requestedByUserId: session.user.id,
+  });
+
+  await recordReportArtifacts({
+    deliveryId: delivery.id,
+    artifacts: [
+      {
+        artifactType: "PRIMARY",
+        dataset: parsed.dataset,
+        format: parsed.format,
+        fileName: artifact.fileName,
+        contentType: artifact.contentType,
+        storageProvider: stored.storageProvider,
+        storageKey: stored.storageKey,
+        storageUrl: stored.storageUrl,
+        checksumSha256,
+        byteSize:
+          typeof artifact.body === "string"
+            ? Buffer.byteLength(artifact.body)
+            : artifact.body.byteLength,
+        manifestEntry: {
+          dataset: parsed.dataset,
+          format: parsed.format,
+        },
+      },
+    ],
   });
 
   return new Response(artifact.body, {

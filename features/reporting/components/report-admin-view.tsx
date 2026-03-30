@@ -67,16 +67,25 @@ export function ReportingAdminView({ data }: ReportingAdminViewProps) {
                     </td>
                     <td className="px-3 py-2">{delivery.rowCount}</td>
                     <td className="px-3 py-2">
-                      {delivery.primaryFileName && delivery.storageKey ? (
-                        <a
-                          href={`/api/reports/download/${delivery.id}`}
-                          className="rounded-full border border-line px-3 py-1 text-xs font-semibold"
-                        >
-                          Download
-                        </a>
-                      ) : (
-                        <span className="text-muted">Unavailable</span>
-                      )}
+                      <div className="flex flex-wrap gap-2">
+                        {delivery.primaryFileName && delivery.storageKey ? (
+                          <a
+                            href={`/api/reports/download/${delivery.id}`}
+                            className="rounded-full border border-line px-3 py-1 text-xs font-semibold"
+                          >
+                            Download
+                          </a>
+                        ) : (
+                          <span className="text-muted">Unavailable</span>
+                        )}
+                        {delivery.packageType === "BUNDLE" ? (
+                          <span className="rounded-full border border-line px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-muted">
+                            {Array.isArray((delivery.packageManifest as { members?: unknown[] } | null)?.members)
+                              ? `${(delivery.packageManifest as { members: unknown[] }).members.length} files`
+                              : "bundle"}
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -300,6 +309,10 @@ export function ReportingAdminView({ data }: ReportingAdminViewProps) {
             <input name="slug" placeholder="playlist-slug" className="rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm" required />
             <input name="rotationSeconds" type="number" min="10" max="300" defaultValue={20} className="rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm" required />
             <input name="heartbeatIntervalSeconds" type="number" min="15" max="300" defaultValue={60} className="rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm" required />
+            <input name="departmentCode" placeholder="Department code (optional)" className="rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm" />
+            <input name="shiftCode" placeholder="Shift code (optional)" className="rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm" />
+            <input name="startsAtLocal" placeholder="06:00:00" className="rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm" />
+            <input name="endsAtLocal" placeholder="14:30:00" className="rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm" />
             <textarea name="description" rows={2} placeholder="Playlist description" className="sm:col-span-2 rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm" />
             <textarea name="templateSlugs" rows={3} placeholder="Pinned template slugs, comma separated" className="sm:col-span-2 rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm" required />
             <label className="sm:col-span-2 flex items-center gap-3 text-sm text-muted">
@@ -320,6 +333,10 @@ export function ReportingAdminView({ data }: ReportingAdminViewProps) {
                   <input name="slug" defaultValue={playlist.slug} className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm" />
                   <input name="rotationSeconds" type="number" min="10" max="300" defaultValue={playlist.rotationSeconds} className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm" />
                   <input name="heartbeatIntervalSeconds" type="number" min="15" max="300" defaultValue={playlist.heartbeatIntervalSeconds} className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm" />
+                  <input name="departmentCode" defaultValue={playlist.departmentCode ?? ""} className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm" />
+                  <input name="shiftCode" defaultValue={playlist.shiftCode ?? ""} className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm" />
+                  <input name="startsAtLocal" defaultValue={playlist.startsAtLocal ?? ""} className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm" />
+                  <input name="endsAtLocal" defaultValue={playlist.endsAtLocal ?? ""} className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm" />
                   <textarea name="description" rows={2} defaultValue={playlist.description ?? ""} className="sm:col-span-2 rounded-2xl border border-line bg-panel px-4 py-3 text-sm" />
                   <textarea name="templateSlugs" rows={3} defaultValue={playlist.items.map((item) => item.templateSlug).join(", ")} className="sm:col-span-2 rounded-2xl border border-line bg-panel px-4 py-3 text-sm" />
                   <label className="sm:col-span-2 flex items-center gap-3 text-sm text-muted">
@@ -330,6 +347,12 @@ export function ReportingAdminView({ data }: ReportingAdminViewProps) {
                     <button type="submit" className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-black">
                       Update playlist
                     </button>
+                    <a
+                      href={`/ops/reports/display/playlists/${playlist.slug}`}
+                      className="rounded-full border border-line px-4 py-2 text-sm font-semibold"
+                    >
+                      Ops preview
+                    </a>
                     <a
                       href={`/display/playlists/${playlist.slug}?access=DISPLAY_ACCESS_TOKEN`}
                       className="rounded-full border border-line px-4 py-2 text-sm font-semibold"
@@ -392,6 +415,35 @@ export function ReportingAdminView({ data }: ReportingAdminViewProps) {
                   ))}
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div className="rounded-[1.75rem] border border-line/80 bg-panel-strong p-6">
+            <p className="font-semibold">Readiness delivery channels</p>
+            <div className="mt-4 space-y-3 text-sm">
+              {data.notificationEvents.map((notification) => (
+                <div key={notification.id} className="rounded-2xl border border-line/80 bg-white/[0.03] p-4">
+                  <p className="font-semibold">
+                    Job {notification.jobNumber} · {notification.releaseCode}
+                  </p>
+                  <p className="mt-1 text-muted">{notification.message}</p>
+                </div>
+              ))}
+              {data.notificationEvents.length === 0 ? (
+                <p className="text-muted">No active readiness blockers.</p>
+              ) : null}
+            </div>
+            <div className="mt-4 space-y-2 text-sm">
+              {data.notificationDeliveryRows.map((delivery) => (
+                <div key={delivery.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line/80 bg-white/[0.03] px-4 py-3">
+                  <span>
+                    {delivery.channel} · {delivery.recipient}
+                  </span>
+                  <span className={delivery.status === "FAILED" ? "text-warning" : "text-muted"}>
+                    {delivery.status}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         </div>

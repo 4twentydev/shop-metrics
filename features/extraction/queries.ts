@@ -33,6 +33,13 @@ function getQueueState(input: {
 
   if (
     input.latestRun?.status === "SUCCEEDED" &&
+    input.latestRun.reviewStatus === "REJECTED"
+  ) {
+    return "FAILED" as const;
+  }
+
+  if (
+    input.latestRun?.status === "SUCCEEDED" &&
     input.latestRun.reviewStatus !== "APPROVED"
   ) {
     return "PENDING_REVIEW" as const;
@@ -124,10 +131,13 @@ export async function getExtractionReviewPageData(input?: {
             normalizedOutput: releaseExtractionRuns.normalizedOutput,
             reviewedOutput: releaseExtractionRuns.reviewedOutput,
             errorMessage: releaseExtractionRuns.errorMessage,
+            failureReason: releaseExtractionRuns.failureReason,
+            failureTriageNotes: releaseExtractionRuns.failureTriageNotes,
             reviewerNotes: releaseExtractionRuns.reviewerNotes,
             startedAt: releaseExtractionRuns.startedAt,
             completedAt: releaseExtractionRuns.completedAt,
             approvedAt: releaseExtractionRuns.approvedAt,
+            rejectedAt: releaseExtractionRuns.rejectedAt,
             processingMetadata: releaseExtractionRuns.processingMetadata,
             createdByName: users.name,
           })

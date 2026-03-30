@@ -1,8 +1,10 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
+
 import { writeAuditLog } from "@/lib/audit/log";
 import { db } from "@/lib/db";
-import { reportExportDeliveries } from "@/lib/db/schema";
+import { reportExportArtifacts, reportExportDeliveries } from "@/lib/db/schema";
 import { fileStorage } from "@/lib/storage";
 import { formatNumber } from "@/lib/utils";
 
@@ -48,6 +50,66 @@ function rowsToSpreadsheetXml(title: string, columns: string[], rows: string[][]
     </Table>
   </Worksheet>
 </Workbook>`;
+}
+
+function toBuffer(body: string | Buffer) {
+  return typeof body === "string" ? Buffer.from(body, "utf-8") : body;
+}
+
+function tarPad(size: number) {
+  const remainder = size % 512;
+  return remainder === 0 ? 0 : 512 - remainder;
+}
+
+function writeTarHeader(input: { fileName: string; size: number; mode?: string }) {
+  const header = Buffer.alloc(512, 0);
+  const writeString = (value: string, offset: number, length: number) => {
+    header.write(value.slice(0, length), offset, Math.min(length, Buffer.byteLength(value)));
+  };
+  const writeOctal = (value: number, offset: number, length: number) => {
+    const normalized = value.toString(8).padStart(length - 1, "0");
+    header.write(`${normalized}\0`, offset, length, "ascii");
+  };
+
+  writeString(input.fileName, 0, 100);
+  writeOctal(Number.parseInt(input.mode ?? "644", 8), 100, 8);
+  writeOctal(0, 108, 8);
+  writeOctal(0, 116, 8);
+  writeOctal(input.size, 124, 12);
+  writeOctal(Math.floor(Date.now() / 1000), 136, 12);
+  header.fill(" ", 148, 156);
+  header[156] = "0".charCodeAt(0);
+  writeString("ustar", 257, 6);
+  writeString("00", 263, 2);
+
+  let checksum = 0;
+  for (const byte of header.values()) {
+    checksum += byte;
+  }
+
+  header.write(`${checksum.toString(8).padStart(6, "0")}\0 `, 148, 8, "ascii");
+  return header;
+}
+
+function buildTarArchive(
+  files: Array<{
+    fileName: string;
+    body: Buffer;
+  }>,
+) {
+  const chunks: Buffer[] = [];
+
+  for (const file of files) {
+    chunks.push(writeTarHeader({ fileName: file.fileName, size: file.body.byteLength }));
+    chunks.push(file.body);
+    const padding = tarPad(file.body.byteLength);
+    if (padding > 0) {
+      chunks.push(Buffer.alloc(padding, 0));
+    }
+  }
+
+  chunks.push(Buffer.alloc(1024, 0));
+  return Buffer.concat(chunks);
 }
 
 function escapePdfText(value: string) {
@@ -261,6 +323,44 @@ export async function recordReportDelivery(input: {
   return inserted[0]!;
 }
 
+export async function recordReportArtifacts(input: {
+  deliveryId: string;
+  artifacts: Array<{
+    artifactType: "PRIMARY" | "BUNDLE_MEMBER";
+    dataset?: string | null;
+    format?: string | null;
+    fileName: string;
+    contentType: string;
+    storageProvider?: string | null;
+    storageKey?: string | null;
+    storageUrl?: string | null;
+    checksumSha256?: string | null;
+    byteSize?: number | null;
+    manifestEntry?: Record<string, unknown> | null;
+  }>;
+}) {
+  if (input.artifacts.length === 0) {
+    return;
+  }
+
+  await db.insert(reportExportArtifacts).values(
+    input.artifacts.map((artifact) => ({
+      deliveryId: input.deliveryId,
+      artifactType: artifact.artifactType,
+      dataset: artifact.dataset ?? null,
+      format: artifact.format ?? null,
+      fileName: artifact.fileName,
+      contentType: artifact.contentType,
+      storageProvider: artifact.storageProvider ?? null,
+      storageKey: artifact.storageKey ?? null,
+      storageUrl: artifact.storageUrl ?? null,
+      checksumSha256: artifact.checksumSha256 ?? null,
+      byteSize: artifact.byteSize ?? null,
+      manifestEntry: artifact.manifestEntry ?? null,
+    })),
+  );
+}
+
 export async function storeReportArtifact(input: {
   fileName: string;
   contentType: string;
@@ -280,4 +380,135 @@ export async function storeReportArtifact(input: {
     fileName: input.fileName,
     namespace: `report-exports/${input.reportView.toLowerCase()}/${input.windowType.toLowerCase()}/${input.windowStart}`,
   });
+}
+
+export async function buildAndStoreReportBundle(input: {
+  report: ReportViewModel;
+  formats: ReportExportFormat[];
+  datasets: ReportDataset[];
+  templateId?: string | null;
+  requestedByUserId?: string | null;
+}) {
+  const members = [];
+
+  for (const dataset of input.datasets) {
+    for (const format of input.formats) {
+      const artifact = await buildExportArtifact({
+        report: input.report,
+        format,
+        dataset,
+        actorUserId: input.requestedByUserId ?? null,
+      });
+      const buffer = toBuffer(artifact.body);
+      const checksumSha256 = createHash("sha256").update(buffer).digest("hex");
+      const stored = await storeReportArtifact({
+        fileName: artifact.fileName,
+        contentType: artifact.contentType,
+        body: buffer,
+        checksumSha256,
+        reportView: input.report.view,
+        windowType: input.report.range.windowType,
+        windowStart: input.report.range.windowStart,
+      });
+
+      members.push({
+        dataset,
+        format,
+        fileName: artifact.fileName,
+        contentType: artifact.contentType,
+        body: buffer,
+        checksumSha256,
+        storageProvider: stored.storageProvider,
+        storageKey: stored.storageKey,
+        storageUrl: stored.storageUrl,
+      });
+    }
+  }
+
+  const archiveFileName = `${input.report.view.toLowerCase()}-${input.report.range.windowType.toLowerCase()}-${input.report.range.windowStart}-bundle.tar`;
+  const archiveBody = buildTarArchive(
+    members.map((member) => ({
+      fileName: member.fileName,
+      body: member.body,
+    })),
+  );
+  const archiveChecksum = createHash("sha256").update(archiveBody).digest("hex");
+  const storedArchive = await storeReportArtifact({
+    fileName: archiveFileName,
+    contentType: "application/x-tar",
+    body: archiveBody,
+    checksumSha256: archiveChecksum,
+    reportView: input.report.view,
+    windowType: input.report.range.windowType,
+    windowStart: input.report.range.windowStart,
+  });
+
+  const delivery = await recordReportDelivery({
+    report: input.report,
+    templateId: input.templateId ?? null,
+    packageType: "BUNDLE",
+    requestedFormats: input.formats,
+    requestedDatasets: input.datasets,
+    primaryFileName: archiveFileName,
+    primaryContentType: "application/x-tar",
+    storageProvider: storedArchive.storageProvider,
+    storageKey: storedArchive.storageKey,
+    storageUrl: storedArchive.storageUrl,
+    byteSize: archiveBody.byteLength,
+    rowCount: members.length,
+    packageManifest: {
+      archiveFileName,
+      members: members.map((member) => ({
+        dataset: member.dataset,
+        format: member.format,
+        fileName: member.fileName,
+        contentType: member.contentType,
+        checksumSha256: member.checksumSha256,
+      })),
+    },
+    requestedByUserId: input.requestedByUserId ?? null,
+  });
+
+  await recordReportArtifacts({
+    deliveryId: delivery.id,
+    artifacts: [
+      {
+        artifactType: "PRIMARY",
+        fileName: archiveFileName,
+        contentType: "application/x-tar",
+        storageProvider: storedArchive.storageProvider,
+        storageKey: storedArchive.storageKey,
+        storageUrl: storedArchive.storageUrl,
+        checksumSha256: archiveChecksum,
+        byteSize: archiveBody.byteLength,
+        manifestEntry: {
+          type: "bundle",
+          memberCount: members.length,
+        },
+      },
+      ...members.map((member) => ({
+        artifactType: "BUNDLE_MEMBER" as const,
+        dataset: member.dataset,
+        format: member.format,
+        fileName: member.fileName,
+        contentType: member.contentType,
+        storageProvider: member.storageProvider,
+        storageKey: member.storageKey,
+        storageUrl: member.storageUrl,
+        checksumSha256: member.checksumSha256,
+        byteSize: member.body.byteLength,
+        manifestEntry: {
+          dataset: member.dataset,
+          format: member.format,
+        },
+      })),
+    ],
+  });
+
+  return {
+    deliveryId: delivery.id,
+    fileName: archiveFileName,
+    contentType: "application/x-tar",
+    body: archiveBody,
+  };
 }

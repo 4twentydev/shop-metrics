@@ -7,9 +7,11 @@ import { writeAuditLog } from "@/lib/audit/log";
 import { requireOpsRole } from "@/lib/auth/permissions";
 import { db } from "@/lib/db";
 import {
+  departments,
   displayPlaylistItems,
   displayPlaylists,
   reportTemplates,
+  shifts,
 } from "@/lib/db/schema";
 
 import { optionalString } from "./schemas";
@@ -49,9 +51,34 @@ export async function saveDisplayPlaylistAction(formData: FormData) {
     description: optionalString(formData, "description"),
     rotationSeconds: formData.get("rotationSeconds"),
     heartbeatIntervalSeconds: formData.get("heartbeatIntervalSeconds"),
+    departmentCode: optionalString(formData, "departmentCode"),
+    shiftCode: optionalString(formData, "shiftCode"),
+    startsAtLocal: optionalString(formData, "startsAtLocal"),
+    endsAtLocal: optionalString(formData, "endsAtLocal"),
     isActive: formData.get("isActive") === "on",
     templateSlugs: formData.get("templateSlugs"),
   });
+
+  const [department, shift] = await Promise.all([
+    parsed.departmentCode
+      ? db.query.departments.findFirst({
+          where: eq(departments.code, parsed.departmentCode),
+        })
+      : Promise.resolve(null),
+    parsed.shiftCode
+      ? db.query.shifts.findFirst({
+          where: eq(shifts.code, parsed.shiftCode),
+        })
+      : Promise.resolve(null),
+  ]);
+
+  if (parsed.departmentCode && !department) {
+    throw new Error(`Department ${parsed.departmentCode} was not found.`);
+  }
+
+  if (parsed.shiftCode && !shift) {
+    throw new Error(`Shift ${parsed.shiftCode} was not found.`);
+  }
 
   const templateSlugs = parsed.templateSlugs
     .split(",")
@@ -72,6 +99,10 @@ export async function saveDisplayPlaylistAction(formData: FormData) {
         description: parsed.description ?? null,
         rotationSeconds: parsed.rotationSeconds,
         heartbeatIntervalSeconds: parsed.heartbeatIntervalSeconds,
+        departmentId: department?.id ?? null,
+        shiftId: shift?.id ?? null,
+        startsAtLocal: parsed.startsAtLocal ?? null,
+        endsAtLocal: parsed.endsAtLocal ?? null,
         isActive: parsed.isActive,
         updatedByUserId: session.user.id,
         updatedAt: new Date(),
@@ -101,6 +132,8 @@ export async function saveDisplayPlaylistAction(formData: FormData) {
       afterState: {
         slug: parsed.slug,
         templateSlugs,
+        departmentCode: parsed.departmentCode,
+        shiftCode: parsed.shiftCode,
       },
     });
   } else {
@@ -112,6 +145,10 @@ export async function saveDisplayPlaylistAction(formData: FormData) {
         description: parsed.description ?? null,
         rotationSeconds: parsed.rotationSeconds,
         heartbeatIntervalSeconds: parsed.heartbeatIntervalSeconds,
+        departmentId: department?.id ?? null,
+        shiftId: shift?.id ?? null,
+        startsAtLocal: parsed.startsAtLocal ?? null,
+        endsAtLocal: parsed.endsAtLocal ?? null,
         isActive: parsed.isActive,
         createdByUserId: session.user.id,
         updatedByUserId: session.user.id,
@@ -136,11 +173,14 @@ export async function saveDisplayPlaylistAction(formData: FormData) {
       afterState: {
         slug: parsed.slug,
         templateSlugs,
+        departmentCode: parsed.departmentCode,
+        shiftCode: parsed.shiftCode,
       },
     });
   }
 
   revalidatePath("/ops/reports/admin");
+  revalidatePath("/ops/reports/display");
 }
 
 export async function deleteDisplayPlaylistAction(formData: FormData) {
@@ -166,4 +206,5 @@ export async function deleteDisplayPlaylistAction(formData: FormData) {
   });
 
   revalidatePath("/ops/reports/admin");
+  revalidatePath("/ops/reports/display");
 }

@@ -23,6 +23,7 @@ Production foundation for a panel-centric manufacturing metrics platform built o
 - Snapshot-based metrics engine with targets and tested formulas
 - Reporting dashboards, configurable templates, and multi-format exports
 - Scheduled reporting operations, delivery history, and display-screen mode
+- Bulk extraction review, scheduled display playlists, notification delivery logs, and export archives
 
 ## Architecture notes
 
@@ -172,6 +173,7 @@ Conditional:
 - SQL migration: [`drizzle/0006_reporting_operations.sql`](./drizzle/0006_reporting_operations.sql)
 - SQL migration: [`drizzle/0007_export_storage.sql`](./drizzle/0007_export_storage.sql)
 - SQL migration: [`drizzle/0008_operational_hardening.sql`](./drizzle/0008_operational_hardening.sql)
+- SQL migration: [`drizzle/0009_bulk_review_notifications_archives.sql`](./drizzle/0009_bulk_review_notifications_archives.sql)
 - Seed script: [`scripts/seed.ts`](./scripts/seed.ts)
 
 ## Work-entry routes
@@ -198,9 +200,11 @@ Conditional:
 - Reporting admin: `/ops/reports/admin`
 - Display mode index: `/ops/reports/display`
 - Display mode by template: `/ops/reports/display/[templateSlug]`
+- Display playlist preview: `/ops/reports/display/playlists/[playlistSlug]`
 - Public display index: `/display?access=DISPLAY_ACCESS_TOKEN`
 - Public display by template: `/display/[templateSlug]?access=DISPLAY_ACCESS_TOKEN`
 - Public display playlist: `/display/playlists/[playlistSlug]?access=DISPLAY_ACCESS_TOKEN`
+- Public scheduled display resolver: `/display/schedule?access=DISPLAY_ACCESS_TOKEN&department=PNL&shift=DAY`
 - Accountability: `/ops/reports/accountability`
 - Rework: `/ops/reports/rework`
 - Bottlenecks: `/ops/reports/bottlenecks`
@@ -209,6 +213,7 @@ Conditional:
 - Job drilldown: `/ops/reports/jobs/[jobNumber]`
 - Release drilldown: `/ops/reports/releases/[releaseCode]`
 - Exports: `/api/reports/export`
+- Export bundles: `/api/reports/export/bundle`
 - Stored export download: `/api/reports/download/[deliveryId]`
 - Display heartbeat ingest: `/api/display/heartbeat`
 
@@ -229,6 +234,7 @@ Conditional:
 - Extraction runs persist raw model output, normalized structured output, edited reviewed output, confidence, run status, and review status.
 - Extraction preprocessing now orders document families by kind and injects document-type-specific guidance before Gemini sees the release packet.
 - Bulk extraction start and retry actions are available from the extraction queue for selected releases.
+- Bulk approval and rejection actions are available from the extraction queue, with triaged failure reasons stored on extraction runs.
 - Extraction combines the release's current document set into one release-level summary.
 - AI output is never auto-approved. Reviewers edit fields first, then explicitly approve the baseline.
 - Revised uploads can keep a release in stale-baseline review until a reviewed extraction run is approved.
@@ -241,6 +247,7 @@ Conditional:
 - Employee release availability now follows release-readiness rules, so stale-baseline and failed-extraction releases stay blocked from work-entry.
 - Leads verify in-flight work, leave comments, and see cross-department totals only on the lead route.
 - Active release-readiness notifications are surfaced on the lead work-entry route when stale baselines or failed extractions are blocking production.
+- Readiness blockers can now send deduplicated email notifications to ops/admin roles, with delivery rows persisted for auditability.
 - Submit-all locks the submission and all child entries.
 - Reopen requires a reason and is written to the audit log.
 - Entry edits are versioned and marked with editor and reason.

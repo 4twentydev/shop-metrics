@@ -2,6 +2,9 @@ import Link from "next/link";
 
 import {
   approveExtractionBaselineAction,
+  bulkApproveExtractionBaselinesAction,
+  bulkRejectExtractionRunsAction,
+  rejectExtractionRunAction,
   retryBulkExtractionAction,
   retryReleaseExtractionAction,
   saveExtractionReviewAction,
@@ -37,6 +40,40 @@ export function ExtractionReviewView({ data }: ExtractionReviewViewProps) {
             className="rounded-full border border-line px-4 py-2 text-sm font-semibold"
           >
             Retry selected releases
+          </button>
+        </form>
+        <form action={bulkApproveExtractionBaselinesAction} id="bulk-approve-form">
+          <button
+            type="submit"
+            className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-black"
+          >
+            Approve selected baselines
+          </button>
+        </form>
+        <form action={bulkRejectExtractionRunsAction} id="bulk-reject-form" className="flex flex-wrap gap-3">
+          <select
+            name="failureReason"
+            defaultValue="HUMAN_REVIEW_REQUIRED"
+            className="rounded-full border border-line bg-panel px-4 py-2 text-sm"
+          >
+            <option value="HUMAN_REVIEW_REQUIRED">Human review required</option>
+            <option value="DOCUMENT_SET_INVALID">Document set invalid</option>
+            <option value="OCR_QUALITY">OCR quality</option>
+            <option value="MODEL_FAILURE">Model failure</option>
+            <option value="NORMALIZATION_ERROR">Normalization error</option>
+            <option value="TIMEOUT">Timeout</option>
+            <option value="UNKNOWN">Unknown</option>
+          </select>
+          <input
+            name="failureTriageNotes"
+            placeholder="Bulk triage notes"
+            className="rounded-full border border-line bg-panel px-4 py-2 text-sm"
+          />
+          <button
+            type="submit"
+            className="rounded-full border border-line px-4 py-2 text-sm font-semibold"
+          >
+            Reject selected runs
           </button>
         </form>
       </section>
@@ -140,6 +177,30 @@ export function ExtractionReviewView({ data }: ExtractionReviewViewProps) {
                   />
                   Select
                 </label>
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {latestReviewableRun ? (
+                    <label className="inline-flex items-center gap-2 rounded-full border border-line px-3 py-2 text-[11px] uppercase tracking-[0.2em] text-muted">
+                      <input
+                        type="checkbox"
+                        name="extractionRunIds"
+                        value={latestReviewableRun.id}
+                        form="bulk-approve-form"
+                      />
+                      Approve
+                    </label>
+                  ) : null}
+                  {latestRun ? (
+                    <label className="inline-flex items-center gap-2 rounded-full border border-line px-3 py-2 text-[11px] uppercase tracking-[0.2em] text-muted">
+                      <input
+                        type="checkbox"
+                        name="extractionRunIds"
+                        value={latestRun.id}
+                        form="bulk-reject-form"
+                      />
+                      Reject
+                    </label>
+                  ) : null}
+                </div>
                 <p className="font-mono text-xs uppercase tracking-[0.32em] text-accent">
                   Extraction review
                 </p>
@@ -226,14 +287,79 @@ export function ExtractionReviewView({ data }: ExtractionReviewViewProps) {
                           {run.errorMessage ? (
                             <p className="mt-2 text-warning">{run.errorMessage}</p>
                           ) : null}
+                          {run.failureReason ? (
+                            <p className="mt-2 text-sm text-muted">
+                              Triage: {run.failureReason.replaceAll("_", " ")}
+                              {run.failureTriageNotes ? ` · ${run.failureTriageNotes}` : ""}
+                            </p>
+                          ) : null}
                           {run.status === "FAILED" ? (
-                            <form action={retryReleaseExtractionAction} className="mt-3">
+                            <div className="mt-3 flex flex-wrap gap-3">
+                              <form action={retryReleaseExtractionAction}>
+                                <input type="hidden" name="extractionRunId" value={run.id} />
+                                <button
+                                  type="submit"
+                                  className="rounded-full border border-line px-4 py-2 text-sm font-semibold"
+                                >
+                                  Retry extraction
+                                </button>
+                              </form>
+                              <form action={rejectExtractionRunAction} className="flex flex-wrap gap-3">
+                                <input type="hidden" name="extractionRunId" value={run.id} />
+                                <select
+                                  name="failureReason"
+                                  defaultValue={run.failureReason ?? "HUMAN_REVIEW_REQUIRED"}
+                                  className="rounded-full border border-line bg-panel px-4 py-2 text-sm"
+                                >
+                                  <option value="HUMAN_REVIEW_REQUIRED">Human review required</option>
+                                  <option value="DOCUMENT_SET_INVALID">Document set invalid</option>
+                                  <option value="OCR_QUALITY">OCR quality</option>
+                                  <option value="MODEL_FAILURE">Model failure</option>
+                                  <option value="NORMALIZATION_ERROR">Normalization error</option>
+                                  <option value="TIMEOUT">Timeout</option>
+                                  <option value="UNKNOWN">Unknown</option>
+                                </select>
+                                <input
+                                  name="failureTriageNotes"
+                                  defaultValue={run.failureTriageNotes ?? ""}
+                                  placeholder="Triage notes"
+                                  className="rounded-full border border-line bg-panel px-4 py-2 text-sm"
+                                />
+                                <button
+                                  type="submit"
+                                  className="rounded-full border border-line px-4 py-2 text-sm font-semibold"
+                                >
+                                  Mark triaged
+                                </button>
+                              </form>
+                            </div>
+                          ) : null}
+                          {run.status === "SUCCEEDED" && run.reviewStatus !== "APPROVED" ? (
+                            <form action={rejectExtractionRunAction} className="mt-3 flex flex-wrap gap-3">
                               <input type="hidden" name="extractionRunId" value={run.id} />
+                              <select
+                                name="failureReason"
+                                defaultValue="HUMAN_REVIEW_REQUIRED"
+                                className="rounded-full border border-line bg-panel px-4 py-2 text-sm"
+                              >
+                                <option value="HUMAN_REVIEW_REQUIRED">Human review required</option>
+                                <option value="DOCUMENT_SET_INVALID">Document set invalid</option>
+                                <option value="OCR_QUALITY">OCR quality</option>
+                                <option value="MODEL_FAILURE">Model failure</option>
+                                <option value="NORMALIZATION_ERROR">Normalization error</option>
+                                <option value="TIMEOUT">Timeout</option>
+                                <option value="UNKNOWN">Unknown</option>
+                              </select>
+                              <input
+                                name="failureTriageNotes"
+                                placeholder="Reject reason"
+                                className="rounded-full border border-line bg-panel px-4 py-2 text-sm"
+                              />
                               <button
                                 type="submit"
                                 className="rounded-full border border-line px-4 py-2 text-sm font-semibold"
                               >
-                                Retry extraction
+                                Reject run
                               </button>
                             </form>
                           ) : null}

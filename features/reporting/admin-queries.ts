@@ -3,10 +3,12 @@ import "server-only";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
 import { getMetricTargetAdminList } from "@/features/metrics/queries";
+import { getActiveReadinessNotifications } from "@/features/releases/readiness-notifications";
 import { env } from "@/lib/env";
 import { db } from "@/lib/db";
 import {
   metricTargetVersions,
+  notificationDeliveries,
   reportExportDeliveries,
   reportTemplateVersions,
   reportTemplates,
@@ -17,7 +19,7 @@ import { getDisplayHeartbeatAdminData, getDisplayPlaylists } from "./display-que
 import { getSavedReportTemplates } from "./queries";
 
 export async function getReportingAdminPageData() {
-  const [targets, archivedTargets, templates, archivedTemplates, deliveries, targetChanges, templateChanges, playlists, heartbeats] = await Promise.all([
+  const [targets, archivedTargets, templates, archivedTemplates, deliveries, targetChanges, templateChanges, playlists, heartbeats, notificationEvents, notificationDeliveryRows] = await Promise.all([
     getMetricTargetAdminList(),
     getMetricTargetAdminList({ includeDeleted: true, deletedOnly: true }),
     getSavedReportTemplates(),
@@ -56,6 +58,7 @@ export async function getReportingAdminPageData() {
         status: reportExportDeliveries.status,
         storageProvider: reportExportDeliveries.storageProvider,
         storageKey: reportExportDeliveries.storageKey,
+        packageManifest: reportExportDeliveries.packageManifest,
         deliveredAt: reportExportDeliveries.deliveredAt,
         requestedByName: users.name,
       })
@@ -89,6 +92,19 @@ export async function getReportingAdminPageData() {
       .limit(10),
     getDisplayPlaylists(),
     getDisplayHeartbeatAdminData(),
+    getActiveReadinessNotifications(),
+    db
+      .select({
+        id: notificationDeliveries.id,
+        recipient: notificationDeliveries.recipient,
+        channel: notificationDeliveries.channel,
+        status: notificationDeliveries.status,
+        sentAt: notificationDeliveries.sentAt,
+        errorMessage: notificationDeliveries.errorMessage,
+      })
+      .from(notificationDeliveries)
+      .orderBy(desc(notificationDeliveries.createdAt))
+      .limit(20),
   ]);
 
   const archivedTemplateRows = archivedTemplates.filter((template) => template.deletedAt);
@@ -103,6 +119,8 @@ export async function getReportingAdminPageData() {
     templateChanges,
     playlists,
     heartbeats,
+    notificationEvents,
+    notificationDeliveryRows,
     displayAccessConfigured: Boolean(env.DISPLAY_ACCESS_TOKEN),
   };
 }

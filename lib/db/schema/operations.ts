@@ -78,6 +78,16 @@ export const extractionReviewStatusEnum = pgEnum("extraction_review_status", [
   "REJECTED",
 ]);
 
+export const extractionFailureReasonEnum = pgEnum("extraction_failure_reason", [
+  "DOCUMENT_SET_INVALID",
+  "OCR_QUALITY",
+  "MODEL_FAILURE",
+  "NORMALIZATION_ERROR",
+  "TIMEOUT",
+  "HUMAN_REVIEW_REQUIRED",
+  "UNKNOWN",
+]);
+
 export const workEntryVerificationStatusEnum = pgEnum(
   "work_entry_verification_status",
   ["UNVERIFIED", "VERIFIED", "CHANGES_REQUESTED"],
@@ -139,6 +149,16 @@ export const reportPackageTypeEnum = pgEnum("report_package_type", [
   "SINGLE",
   "BUNDLE",
 ]);
+
+export const notificationChannelEnum = pgEnum("notification_channel", [
+  "IN_APP",
+  "EMAIL",
+]);
+
+export const notificationDeliveryStatusEnum = pgEnum(
+  "notification_delivery_status",
+  ["PENDING", "SENT", "FAILED"],
+);
 
 export const configChangeActionEnum = pgEnum("config_change_action", [
   "CREATED",
@@ -508,6 +528,8 @@ export const releaseExtractionRuns = pgTable("release_extraction_runs", {
     scale: 4,
   }),
   errorMessage: text("error_message"),
+  failureReason: extractionFailureReasonEnum("failure_reason"),
+  failureTriageNotes: text("failure_triage_notes"),
   reviewerNotes: text("reviewer_notes"),
   createdByUserId: text("created_by_user_id")
     .notNull()
@@ -530,6 +552,10 @@ export const releaseExtractionRuns = pgTable("release_extraction_runs", {
     mode: "date",
   }),
   approvedAt: timestamp("approved_at", {
+    withTimezone: true,
+    mode: "date",
+  }),
+  rejectedAt: timestamp("rejected_at", {
     withTimezone: true,
     mode: "date",
   }),
@@ -575,6 +601,40 @@ export const releaseReadinessNotifications = pgTable(
       table.notificationType,
     ),
     index("release_readiness_notifications_status_idx").on(table.status, table.detectedAt),
+  ],
+);
+
+export const notificationDeliveries = pgTable(
+  "notification_deliveries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    readinessNotificationId: uuid("readiness_notification_id")
+      .notNull()
+      .references(() => releaseReadinessNotifications.id, { onDelete: "cascade" }),
+    channel: notificationChannelEnum("channel").notNull(),
+    recipient: varchar("recipient", { length: 255 }).notNull(),
+    status: notificationDeliveryStatusEnum("status").notNull().default("PENDING"),
+    provider: varchar("provider", { length: 64 }),
+    providerMessageId: varchar("provider_message_id", { length: 255 }),
+    sentAt: timestamp("sent_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    errorMessage: text("error_message"),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("notification_deliveries_unique_idx").on(
+      table.readinessNotificationId,
+      table.channel,
+      table.recipient,
+    ),
   ],
 );
 
@@ -968,6 +1028,14 @@ export const displayPlaylists = pgTable(
     heartbeatIntervalSeconds: integer("heartbeat_interval_seconds")
       .notNull()
       .default(60),
+    departmentId: uuid("department_id").references(() => departments.id, {
+      onDelete: "set null",
+    }),
+    shiftId: uuid("shift_id").references(() => shifts.id, {
+      onDelete: "set null",
+    }),
+    startsAtLocal: time("starts_at_local"),
+    endsAtLocal: time("ends_at_local"),
     isActive: boolean("is_active").notNull().default(true),
     createdByUserId: text("created_by_user_id")
       .notNull()
@@ -990,6 +1058,11 @@ export const displayPlaylists = pgTable(
   },
   (table) => [
     index("display_playlists_active_idx").on(table.isActive, table.slug),
+    index("display_playlists_schedule_idx").on(
+      table.isActive,
+      table.departmentId,
+      table.shiftId,
+    ),
   ],
 );
 
@@ -1109,5 +1182,35 @@ export const reportExportDeliveries = pgTable(
       table.scopeType,
       table.scopeKey,
     ),
+  ],
+);
+
+export const reportExportArtifacts = pgTable(
+  "report_export_artifacts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    deliveryId: uuid("delivery_id")
+      .notNull()
+      .references(() => reportExportDeliveries.id, { onDelete: "cascade" }),
+    artifactType: varchar("artifact_type", { length: 32 }).notNull(),
+    dataset: varchar("dataset", { length: 32 }),
+    format: varchar("format", { length: 32 }),
+    fileName: varchar("file_name", { length: 255 }).notNull(),
+    contentType: varchar("content_type", { length: 128 }).notNull(),
+    storageProvider: varchar("storage_provider", { length: 32 }),
+    storageKey: text("storage_key"),
+    storageUrl: text("storage_url"),
+    checksumSha256: varchar("checksum_sha256", { length: 64 }),
+    byteSize: integer("byte_size"),
+    manifestEntry: jsonb("manifest_entry"),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("report_export_artifacts_delivery_idx").on(table.deliveryId, table.createdAt),
   ],
 );
