@@ -76,7 +76,9 @@ export default async function OpsDisplayPlaylistPreviewPage({
         rotationSeconds={playlist.rotationSeconds}
         heartbeatIntervalSeconds={playlist.heartbeatIntervalSeconds}
         currentTemplateSlug={currentItem.templateSlug}
-        anchorDate={resolvedSearchParams.anchorDate}
+        {...(resolvedSearchParams.anchorDate !== undefined && {
+          anchorDate: resolvedSearchParams.anchorDate,
+        })}
       />
       <ReportDisplayView
         data={data}
