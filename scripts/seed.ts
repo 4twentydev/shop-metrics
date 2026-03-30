@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 
-import { db } from "@/lib/db";
+import { db } from "@/lib/db/client";
 import {
   auditLogs,
   departments,
