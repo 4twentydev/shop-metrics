@@ -81,7 +81,9 @@ export async function runMetricSnapshotBackfill(input: {
       await runMetricSnapshotJob({
         windowType,
         anchorBusinessDate: input.anchorBusinessDate,
-        actorUserId: input.actorUserId,
+        ...(input.actorUserId !== undefined && {
+          actorUserId: input.actorUserId,
+        }),
       }),
     );
   }
