@@ -36,6 +36,13 @@
       "when": 1774857600000,
       "tag": "0004_metrics_engine",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1774861200000,
+      "tag": "0005_reporting_dashboards",
+      "breakpoints": true
     }
   ]
 }

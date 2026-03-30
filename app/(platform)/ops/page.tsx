@@ -58,6 +58,12 @@ export default async function OpsPage() {
         >
           Open extraction review
         </Link>
+        <Link
+          href="/ops/reports"
+          className="mt-3 inline-flex rounded-full border border-line px-5 py-3 text-sm font-semibold"
+        >
+          Open reporting dashboards
+        </Link>
       </section>
 
       <section className="space-y-4">
@@ -69,11 +75,11 @@ export default async function OpsPage() {
           <p className="mt-2 text-sm text-muted">{session.user.email}</p>
         </div>
         <div className="rounded-[1.75rem] border border-line/80 bg-panel-strong p-6">
-          <p className="font-semibold">Next operational modules</p>
+          <p className="font-semibold">Current platform modules</p>
           <ul className="mt-4 space-y-3 text-sm leading-6 text-muted">
-            <li>Job and release administration with baseline approvals</li>
-            <li>Document ingestion and AI-assisted extraction review</li>
-            <li>Targets, reporting summaries, and export pipelines</li>
+            <li>Shift work entry, lead verification, submit-all locking, and reopen audits</li>
+            <li>Release intake, controlled revision review, and Gemini-assisted extraction</li>
+            <li>Executive and drilldown reporting with configurable templates and exports</li>
           </ul>
         </div>
       </section>

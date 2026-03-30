@@ -21,6 +21,7 @@ Production foundation for a panel-centric manufacturing metrics platform built o
 - Release intake and document revision vertical slice
 - Gemini extraction review vertical slice
 - Snapshot-based metrics engine with targets and tested formulas
+- Reporting dashboards, configurable templates, and multi-format exports
 
 ## Architecture notes
 
@@ -58,6 +59,7 @@ features/
   auth/components/
   extraction/
   metrics/
+  reporting/
   releases/
   release-intake/
   time/
@@ -161,6 +163,7 @@ Conditional:
 - SQL migration: [`drizzle/0002_release_intake_documents.sql`](./drizzle/0002_release_intake_documents.sql)
 - SQL migration: [`drizzle/0003_gemini_release_extraction.sql`](./drizzle/0003_gemini_release_extraction.sql)
 - SQL migration: [`drizzle/0004_metrics_engine.sql`](./drizzle/0004_metrics_engine.sql)
+- SQL migration: [`drizzle/0005_reporting_dashboards.sql`](./drizzle/0005_reporting_dashboards.sql)
 - Seed script: [`scripts/seed.ts`](./scripts/seed.ts)
 
 ## Work-entry routes
@@ -175,6 +178,18 @@ Conditional:
 ## Extraction review route
 
 - Admin / lead route: `/ops/releases/extraction`
+
+## Reporting routes
+
+- Executive overview: `/ops/reports`
+- Accountability: `/ops/reports/accountability`
+- Rework: `/ops/reports/rework`
+- Bottlenecks: `/ops/reports/bottlenecks`
+- Department drilldown: `/ops/reports/departments/[departmentCode]`
+- Employee drilldown: `/ops/reports/employees/[employeeCode]`
+- Job drilldown: `/ops/reports/jobs/[jobNumber]`
+- Release drilldown: `/ops/reports/releases/[releaseCode]`
+- Exports: `/api/reports/export`
 
 ## Release intake notes
 
@@ -217,6 +232,14 @@ Conditional:
 - Performance notes live in [`features/metrics/performance-notes.md`](./features/metrics/performance-notes.md).
 - Formula coverage lives in [`tests/metrics/formulas.test.ts`](./tests/metrics/formulas.test.ts).
 
+## Reporting notes
+
+- Report generation is centralized under [`features/reporting`](./features/reporting).
+- Saved templates are persisted in `report_templates` and support configurable summary/raw/pivot visibility.
+- Export formats currently supported by the route handler are CSV, Excel-compatible SpreadsheetML XML, PDF, and web view.
+- Dashboard views are mobile-usable, desktop-optimized, and use restrained Motion only for entrance and tab transitions.
+- Future display-screen mode notes: [`features/reporting/display-mode-notes.md`](./features/reporting/display-mode-notes.md)
+
 ## Auth notes
 
 - Primary sign-in path: passkeys
@@ -229,6 +252,7 @@ Conditional:
 Implement the next operational slice:
 
 - release administration screens linked to downstream work-entry availability
-- reporting summaries and export pipelines based on approved baselines and verified work entry
+- scheduled snapshot/report generation wiring via Vercel Cron
+- target entry and template management ergonomics
 - extraction queue filtering and bulk review ergonomics
 - stronger document-family-specific preprocessing for Gemini inputs

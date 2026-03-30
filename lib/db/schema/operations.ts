@@ -119,6 +119,17 @@ export const metricScopeEnum = pgEnum("metric_scope", [
   "PART_FAMILY",
 ]);
 
+export const reportViewEnum = pgEnum("report_view", [
+  "EXECUTIVE",
+  "DEPARTMENT",
+  "EMPLOYEE",
+  "JOB",
+  "RELEASE",
+  "ACCOUNTABILITY",
+  "REWORK",
+  "BOTTLENECK",
+]);
+
 export const shifts = pgTable("shifts", {
   id: uuid("id").defaultRandom().primaryKey(),
   code: varchar("code", { length: 32 }).notNull().unique(),
@@ -759,6 +770,51 @@ export const metricSnapshots = pgTable(
       table.windowType,
       table.windowStart,
       table.windowEnd,
+      table.scopeType,
+      table.scopeReferenceId,
+      table.scopeKey,
+    ),
+  ],
+);
+
+export const reportTemplates = pgTable(
+  "report_templates",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: varchar("name", { length: 120 }).notNull(),
+    slug: varchar("slug", { length: 120 }).notNull().unique(),
+    description: text("description"),
+    viewType: reportViewEnum("view_type").notNull(),
+    defaultWindowType: metricWindowEnum("default_window_type")
+      .notNull()
+      .default("DAILY"),
+    scopeType: metricScopeEnum("scope_type"),
+    scopeReferenceId: uuid("scope_reference_id"),
+    scopeKey: varchar("scope_key", { length: 128 }),
+    sectionConfig: jsonb("section_config").notNull(),
+    isPinned: boolean("is_pinned").notNull().default(false),
+    createdByUserId: text("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    updatedByUserId: text("updated_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("report_templates_view_scope_idx").on(
+      table.viewType,
       table.scopeType,
       table.scopeReferenceId,
       table.scopeKey,

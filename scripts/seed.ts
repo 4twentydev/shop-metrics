@@ -10,6 +10,7 @@ import {
   jobReleases,
   jobs,
   metricTargets,
+  reportTemplates,
   releaseComments,
   releaseExtractionRuns,
   releaseIntakeBatches,
@@ -1037,6 +1038,74 @@ async function main() {
     ])
     .onConflictDoNothing();
 
+  await db
+    .insert(reportTemplates)
+    .values([
+      {
+        name: "Executive Daily Overview",
+        slug: "executive-daily-overview",
+        description:
+          "Pinned executive template for daily company output and gap review.",
+        viewType: "EXECUTIVE",
+        defaultWindowType: "DAILY",
+        scopeType: "COMPANY",
+        scopeKey: "ELWARD_SYSTEMS",
+        sectionConfig: {
+          includeSummary: true,
+          includeRaw: true,
+          includePivot: true,
+          highlightAccountability: true,
+          highlightBottlenecks: true,
+          mobileCondensed: true,
+        },
+        isPinned: true,
+        createdByUserId: "usr_admin_elward",
+        updatedByUserId: "usr_admin_elward",
+      },
+      {
+        name: "Daily Rework Review",
+        slug: "daily-rework-review",
+        description: "Pinned template for remake attribution and fixing-zone review.",
+        viewType: "REWORK",
+        defaultWindowType: "DAILY",
+        scopeType: "COMPANY",
+        scopeKey: "ELWARD_SYSTEMS",
+        sectionConfig: {
+          includeSummary: true,
+          includeRaw: true,
+          includePivot: true,
+          highlightAccountability: false,
+          highlightBottlenecks: false,
+          mobileCondensed: true,
+        },
+        isPinned: true,
+        createdByUserId: "usr_ops_lead",
+        updatedByUserId: "usr_ops_lead",
+      },
+      {
+        name: "Panel Prep Weekly",
+        slug: "panel-prep-weekly",
+        description: "Weekly department template for panel prep leadership review.",
+        viewType: "DEPARTMENT",
+        defaultWindowType: "WEEKLY",
+        scopeType: "DEPARTMENT",
+        scopeReferenceId: panelPrep.id,
+        scopeKey: panelPrep.code,
+        sectionConfig: {
+          includeSummary: true,
+          includeRaw: true,
+          includePivot: false,
+          highlightAccountability: true,
+          highlightBottlenecks: false,
+          mobileCondensed: true,
+        },
+        isPinned: false,
+        createdByUserId: "usr_department_lead",
+        updatedByUserId: "usr_department_lead",
+      },
+    ])
+    .onConflictDoNothing();
+
   await db.insert(auditLogs).values({
     actorUserId: "usr_admin_elward",
     action: "seed.completed",
@@ -1045,7 +1114,7 @@ async function main() {
       metadata: {
         users: seededUsers.length,
         departments: 6,
-        version: 5,
+        version: 6,
       },
   });
 
