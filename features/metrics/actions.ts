@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/lib/audit/log";
 import { requireOpsRole } from "@/lib/auth/permissions";
 import { db } from "@/lib/db";
-import { metricTargets } from "@/lib/db/schema";
+import { metricTargetVersions, metricTargets } from "@/lib/db/schema";
 
 import { metricScopeSchema, metricWindowSchema } from "./schemas";
 import { z } from "zod";
@@ -33,6 +33,20 @@ function optionalString(formData: FormData, key: string) {
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+async function writeMetricTargetVersion(input: {
+  metricTargetId: string;
+  changeAction: "CREATED" | "UPDATED" | "SOFT_DELETED" | "RESTORED";
+  snapshot: Record<string, unknown>;
+  changedByUserId: string;
+}) {
+  await db.insert(metricTargetVersions).values({
+    metricTargetId: input.metricTargetId,
+    changeAction: input.changeAction,
+    snapshot: input.snapshot,
+    changedByUserId: input.changedByUserId,
+  });
 }
 
 export async function saveMetricTargetAction(formData: FormData) {
@@ -73,6 +87,25 @@ export async function saveMetricTargetAction(formData: FormData) {
       })
       .where(eq(metricTargets.id, parsed.targetId));
 
+    await writeMetricTargetVersion({
+      metricTargetId: parsed.targetId,
+      changeAction: "UPDATED",
+      snapshot: {
+        ...previous,
+        windowType: parsed.windowType,
+        scopeType: parsed.scopeType,
+        scopeReferenceId: parsed.scopeReferenceId,
+        scopeKey: parsed.scopeKey,
+        metricKey: parsed.metricKey,
+        targetValue: parsed.targetValue,
+        unitLabel: parsed.unitLabel,
+        effectiveStart: parsed.effectiveStart,
+        effectiveEnd: parsed.effectiveEnd,
+        notes: parsed.notes,
+      },
+      changedByUserId: session.user.id,
+    });
+
     await writeAuditLog({
       actorUserId: session.user.id,
       action: "metric-target.updated",
@@ -102,6 +135,24 @@ export async function saveMetricTargetAction(formData: FormData) {
       })
       .returning({ id: metricTargets.id });
 
+    await writeMetricTargetVersion({
+      metricTargetId: inserted[0]!.id,
+      changeAction: "CREATED",
+      snapshot: {
+        windowType: parsed.windowType,
+        scopeType: parsed.scopeType,
+        scopeReferenceId: parsed.scopeReferenceId,
+        scopeKey: parsed.scopeKey,
+        metricKey: parsed.metricKey,
+        targetValue: parsed.targetValue,
+        unitLabel: parsed.unitLabel,
+        effectiveStart: parsed.effectiveStart,
+        effectiveEnd: parsed.effectiveEnd,
+        notes: parsed.notes,
+      },
+      changedByUserId: session.user.id,
+    });
+
     await writeAuditLog({
       actorUserId: session.user.id,
       action: "metric-target.created",
@@ -120,6 +171,7 @@ export async function saveMetricTargetAction(formData: FormData) {
 export async function deleteMetricTargetAction(formData: FormData) {
   const session = await requireOpsRole();
   const targetId = String(formData.get("targetId") ?? "");
+  const deletionReason = optionalString(formData, "deletionReason");
 
   const existing = await db.query.metricTargets.findFirst({
     where: eq(metricTargets.id, targetId),
@@ -129,11 +181,69 @@ export async function deleteMetricTargetAction(formData: FormData) {
     throw new Error("Target not found.");
   }
 
-  await db.delete(metricTargets).where(eq(metricTargets.id, targetId));
+  await db
+    .update(metricTargets)
+    .set({
+      deletedAt: new Date(),
+      deletedByUserId: session.user.id,
+      deletionReason,
+      updatedAt: new Date(),
+    })
+    .where(eq(metricTargets.id, targetId));
+
+  await writeMetricTargetVersion({
+    metricTargetId: targetId,
+    changeAction: "SOFT_DELETED",
+    snapshot: {
+      ...existing,
+      deletionReason,
+    },
+    changedByUserId: session.user.id,
+  });
 
   await writeAuditLog({
     actorUserId: session.user.id,
     action: "metric-target.deleted",
+    entityType: "metric_target",
+    entityId: targetId,
+    beforeState: existing,
+  });
+
+  revalidatePath("/ops/reports/admin");
+}
+
+export async function restoreMetricTargetAction(formData: FormData) {
+  const session = await requireOpsRole();
+  const targetId = String(formData.get("targetId") ?? "");
+
+  const existing = await db.query.metricTargets.findFirst({
+    where: eq(metricTargets.id, targetId),
+  });
+
+  if (!existing || !existing.deletedAt) {
+    throw new Error("Archived target not found.");
+  }
+
+  await db
+    .update(metricTargets)
+    .set({
+      deletedAt: null,
+      deletedByUserId: null,
+      deletionReason: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(metricTargets.id, targetId));
+
+  await writeMetricTargetVersion({
+    metricTargetId: targetId,
+    changeAction: "RESTORED",
+    snapshot: existing,
+    changedByUserId: session.user.id,
+  });
+
+  await writeAuditLog({
+    actorUserId: session.user.id,
+    action: "metric-target.restored",
     entityType: "metric_target",
     entityId: targetId,
     beforeState: existing,

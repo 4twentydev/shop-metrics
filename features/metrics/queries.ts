@@ -10,6 +10,7 @@ import {
   isNull,
   lte,
   or,
+  sql,
 } from "drizzle-orm";
 
 import { db } from "@/lib/db";
@@ -159,6 +160,7 @@ export async function loadMetricTargets(range: MetricWindowRange) {
     .where(
       and(
         eq(metricTargets.windowType, range.windowType),
+        isNull(metricTargets.deletedAt),
         lte(metricTargets.effectiveStart, range.windowEnd),
         or(
           isNull(metricTargets.effectiveEnd),
@@ -185,7 +187,16 @@ export async function loadMetricTargets(range: MetricWindowRange) {
   );
 }
 
-export async function getMetricTargetAdminList() {
+export async function getMetricTargetAdminList(input?: {
+  includeDeleted?: boolean;
+  deletedOnly?: boolean;
+}) {
+  const visibilityFilter = input?.deletedOnly
+    ? sql`${metricTargets.deletedAt} is not null`
+    : input?.includeDeleted
+      ? sql`true`
+      : sql`${metricTargets.deletedAt} is null`;
+
   const rows = await db
     .select({
       id: metricTargets.id,
@@ -199,8 +210,11 @@ export async function getMetricTargetAdminList() {
       effectiveStart: metricTargets.effectiveStart,
       effectiveEnd: metricTargets.effectiveEnd,
       notes: metricTargets.notes,
+      deletedAt: metricTargets.deletedAt,
+      deletionReason: metricTargets.deletionReason,
     })
     .from(metricTargets)
+    .where(visibilityFilter)
     .orderBy(
       metricTargets.windowType,
       metricTargets.scopeType,
@@ -221,6 +235,8 @@ export async function getMetricTargetAdminList() {
       effectiveStart: row.effectiveStart,
       effectiveEnd: row.effectiveEnd,
       notes: row.notes,
+      deletedAt: row.deletedAt,
+      deletionReason: row.deletionReason,
     }),
   );
 }

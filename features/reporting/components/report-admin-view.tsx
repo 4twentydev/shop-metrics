@@ -1,11 +1,17 @@
 import {
   deleteMetricTargetAction,
+  restoreMetricTargetAction,
   saveMetricTargetAction,
 } from "@/features/metrics/actions";
 import {
   deleteReportTemplateAction,
+  restoreReportTemplateAction,
   saveReportTemplateAction,
 } from "@/features/reporting/actions";
+import {
+  deleteDisplayPlaylistAction,
+  saveDisplayPlaylistAction,
+} from "@/features/reporting/display-actions";
 import type { getReportingAdminPageData } from "@/features/reporting/admin-queries";
 
 type ReportingAdminViewProps = {
@@ -21,12 +27,12 @@ export function ReportingAdminView({ data }: ReportingAdminViewProps) {
             Reporting admin
           </p>
           <h2 className="mt-4 text-4xl font-semibold tracking-tight">
-            Targets, templates, delivery history, and scheduled operations.
+            Config recovery, kiosk operations, and durable exports.
           </h2>
           <p className="mt-4 text-sm leading-7 text-muted">
-            Use this surface to manage targets, update or retire templates, inspect
-            export packages, and validate that scheduled reporting runs are creating
-            durable retrieval artifacts.
+            Targets and templates now retain change history and recoverable soft deletes.
+            Display playlists and heartbeats live here so kiosk operations are visible
+            alongside export durability and reporting configuration.
           </p>
           <p className="mt-4 text-sm text-muted">
             Public display token configured: {data.displayAccessConfigured ? "yes" : "no"}
@@ -40,9 +46,7 @@ export function ReportingAdminView({ data }: ReportingAdminViewProps) {
                 <tr>
                   <th className="px-3 py-2">View</th>
                   <th className="px-3 py-2">Window</th>
-                  <th className="px-3 py-2">Scope</th>
                   <th className="px-3 py-2">Package</th>
-                  <th className="px-3 py-2">File</th>
                   <th className="px-3 py-2">Storage</th>
                   <th className="px-3 py-2">Rows</th>
                   <th className="px-3 py-2">Download</th>
@@ -55,9 +59,7 @@ export function ReportingAdminView({ data }: ReportingAdminViewProps) {
                     <td className="px-3 py-2">
                       {delivery.windowType} {delivery.windowStart}
                     </td>
-                    <td className="px-3 py-2">{delivery.scopeKey ?? "company"}</td>
                     <td className="px-3 py-2">{delivery.packageType}</td>
-                    <td className="px-3 py-2">{delivery.primaryFileName ?? "n/a"}</td>
                     <td className="px-3 py-2">
                       {delivery.storageProvider && delivery.storageKey
                         ? `${delivery.storageProvider} stored`
@@ -84,9 +86,9 @@ export function ReportingAdminView({ data }: ReportingAdminViewProps) {
         </div>
       </section>
 
-      <section className="grid gap-6 2xl:grid-cols-2">
+      <section className="grid gap-6 xl:grid-cols-2">
         <div className="rounded-[1.75rem] border border-line/80 bg-panel-strong p-6">
-          <p className="font-semibold">Create target</p>
+          <p className="font-semibold">Targets</p>
           <form action={saveMetricTargetAction} className="mt-4 grid gap-3 sm:grid-cols-2">
             <select name="windowType" className="rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm">
               <option value="DAILY">Daily</option>
@@ -142,25 +144,45 @@ export function ReportingAdminView({ data }: ReportingAdminViewProps) {
                   <input name="effectiveStart" type="date" defaultValue={target.effectiveStart} className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm" />
                   <input name="effectiveEnd" type="date" defaultValue={target.effectiveEnd ?? ""} className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm" />
                   <textarea name="notes" rows={2} defaultValue={target.notes ?? ""} className="sm:col-span-2 rounded-2xl border border-line bg-panel px-4 py-3 text-sm" />
-                  <div className="sm:col-span-2 flex flex-wrap gap-3">
-                    <button type="submit" className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-black">
-                      Update target
-                    </button>
-                  </div>
+                  <button type="submit" className="justify-self-start rounded-full bg-accent px-4 py-2 text-sm font-semibold text-black">
+                    Update target
+                  </button>
                 </form>
-                <form action={deleteMetricTargetAction} className="mt-3">
+                <form action={deleteMetricTargetAction} className="mt-3 flex flex-wrap gap-3">
                   <input type="hidden" name="targetId" value={target.id} />
+                  <input name="deletionReason" placeholder="Delete reason" className="rounded-full border border-line bg-panel px-4 py-2 text-sm" />
                   <button type="submit" className="rounded-full border border-line px-4 py-2 text-sm font-semibold">
-                    Delete target
+                    Archive target
                   </button>
                 </form>
               </div>
             ))}
           </div>
+
+          {data.archivedTargets.length > 0 ? (
+            <div className="mt-6 rounded-2xl border border-line/80 bg-white/[0.02] p-4">
+              <p className="font-semibold">Archived targets</p>
+              <div className="mt-3 space-y-3 text-sm">
+                {data.archivedTargets.map((target) => (
+                  <div key={target.id} className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      {target.metricKey} · {target.scopeType} · {target.deletionReason ?? "No reason"}
+                    </div>
+                    <form action={restoreMetricTargetAction}>
+                      <input type="hidden" name="targetId" value={target.id} />
+                      <button type="submit" className="rounded-full border border-line px-4 py-2 text-sm font-semibold">
+                        Restore
+                      </button>
+                    </form>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="rounded-[1.75rem] border border-line/80 bg-panel-strong p-6">
-          <p className="font-semibold">Create template</p>
+          <p className="font-semibold">Templates</p>
           <form action={saveReportTemplateAction} className="mt-4 grid gap-3 sm:grid-cols-2">
             <input name="name" placeholder="Template name" className="rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm" required />
             <input name="slug" placeholder="template-slug" className="rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm" required />
@@ -232,20 +254,145 @@ export function ReportingAdminView({ data }: ReportingAdminViewProps) {
                     <label className="flex items-center gap-3"><input type="checkbox" name="mobileCondensed" defaultChecked={template.sectionConfig.mobileCondensed} />Mobile condensed</label>
                     <label className="flex items-center gap-3"><input type="checkbox" name="isPinned" defaultChecked={template.isPinned} />Pinned for display mode</label>
                   </div>
-                  <div className="sm:col-span-2 flex flex-wrap gap-3">
-                    <button type="submit" className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-black">
-                      Update template
-                    </button>
-                  </div>
+                  <button type="submit" className="justify-self-start rounded-full bg-accent px-4 py-2 text-sm font-semibold text-black">
+                    Update template
+                  </button>
                 </form>
-                <form action={deleteReportTemplateAction} className="mt-3">
+                <form action={deleteReportTemplateAction} className="mt-3 flex flex-wrap gap-3">
                   <input type="hidden" name="templateId" value={template.id} />
+                  <input name="deletionReason" placeholder="Archive reason" className="rounded-full border border-line bg-panel px-4 py-2 text-sm" />
                   <button type="submit" className="rounded-full border border-line px-4 py-2 text-sm font-semibold">
-                    Delete template
+                    Archive template
                   </button>
                 </form>
               </div>
             ))}
+          </div>
+
+          {data.archivedTemplates.length > 0 ? (
+            <div className="mt-6 rounded-2xl border border-line/80 bg-white/[0.02] p-4">
+              <p className="font-semibold">Archived templates</p>
+              <div className="mt-3 space-y-3 text-sm">
+                {data.archivedTemplates.map((template) => (
+                  <div key={template.id} className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      {template.name} · {template.slug} · {template.deletionReason ?? "No reason"}
+                    </div>
+                    <form action={restoreReportTemplateAction}>
+                      <input type="hidden" name="templateId" value={template.id} />
+                      <button type="submit" className="rounded-full border border-line px-4 py-2 text-sm font-semibold">
+                        Restore
+                      </button>
+                    </form>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <div className="rounded-[1.75rem] border border-line/80 bg-panel-strong p-6">
+          <p className="font-semibold">Display playlists</p>
+          <form action={saveDisplayPlaylistAction} className="mt-4 grid gap-3 sm:grid-cols-2">
+            <input name="name" placeholder="Playlist name" className="rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm" required />
+            <input name="slug" placeholder="playlist-slug" className="rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm" required />
+            <input name="rotationSeconds" type="number" min="10" max="300" defaultValue={20} className="rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm" required />
+            <input name="heartbeatIntervalSeconds" type="number" min="15" max="300" defaultValue={60} className="rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm" required />
+            <textarea name="description" rows={2} placeholder="Playlist description" className="sm:col-span-2 rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm" />
+            <textarea name="templateSlugs" rows={3} placeholder="Pinned template slugs, comma separated" className="sm:col-span-2 rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-sm" required />
+            <label className="sm:col-span-2 flex items-center gap-3 text-sm text-muted">
+              <input type="checkbox" name="isActive" defaultChecked />
+              Playlist active
+            </label>
+            <button type="submit" className="justify-self-start rounded-full bg-accent px-5 py-3 text-sm font-semibold text-black">
+              Save playlist
+            </button>
+          </form>
+
+          <div className="mt-6 space-y-3">
+            {data.playlists.map((playlist) => (
+              <div key={playlist.id} className="rounded-2xl border border-line/80 bg-white/[0.03] p-4">
+                <form action={saveDisplayPlaylistAction} className="grid gap-3 sm:grid-cols-2">
+                  <input type="hidden" name="playlistId" value={playlist.id} />
+                  <input name="name" defaultValue={playlist.name} className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm" />
+                  <input name="slug" defaultValue={playlist.slug} className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm" />
+                  <input name="rotationSeconds" type="number" min="10" max="300" defaultValue={playlist.rotationSeconds} className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm" />
+                  <input name="heartbeatIntervalSeconds" type="number" min="15" max="300" defaultValue={playlist.heartbeatIntervalSeconds} className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm" />
+                  <textarea name="description" rows={2} defaultValue={playlist.description ?? ""} className="sm:col-span-2 rounded-2xl border border-line bg-panel px-4 py-3 text-sm" />
+                  <textarea name="templateSlugs" rows={3} defaultValue={playlist.items.map((item) => item.templateSlug).join(", ")} className="sm:col-span-2 rounded-2xl border border-line bg-panel px-4 py-3 text-sm" />
+                  <label className="sm:col-span-2 flex items-center gap-3 text-sm text-muted">
+                    <input type="checkbox" name="isActive" defaultChecked={playlist.isActive} />
+                    Playlist active
+                  </label>
+                  <div className="sm:col-span-2 flex flex-wrap gap-3">
+                    <button type="submit" className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-black">
+                      Update playlist
+                    </button>
+                    <a
+                      href={`/display/playlists/${playlist.slug}?access=DISPLAY_ACCESS_TOKEN`}
+                      className="rounded-full border border-line px-4 py-2 text-sm font-semibold"
+                    >
+                      Public route pattern
+                    </a>
+                  </div>
+                </form>
+                <form action={deleteDisplayPlaylistAction} className="mt-3">
+                  <input type="hidden" name="playlistId" value={playlist.id} />
+                  <button type="submit" className="rounded-full border border-line px-4 py-2 text-sm font-semibold">
+                    Delete playlist
+                  </button>
+                </form>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="rounded-[1.75rem] border border-line/80 bg-panel-strong p-6">
+            <p className="font-semibold">Screen heartbeat monitoring</p>
+            <div className="mt-4 space-y-3 text-sm">
+              {data.heartbeats.map((heartbeat) => (
+                <div key={heartbeat.id} className="rounded-2xl border border-line/80 bg-white/[0.03] p-4">
+                  <p className="font-semibold">
+                    {heartbeat.screenLabel ?? heartbeat.screenKey}
+                  </p>
+                  <p className="mt-1 text-muted">
+                    {heartbeat.playlistName ?? "No playlist"} · {heartbeat.lastTemplateSlug ?? "No template"}
+                  </p>
+                  <p className={heartbeat.isStale ? "mt-2 text-warning" : "mt-2 text-muted"}>
+                    {heartbeat.isStale ? "Heartbeat stale" : "Heartbeat current"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[1.75rem] border border-line/80 bg-panel-strong p-6">
+            <p className="font-semibold">Config change trail</p>
+            <div className="mt-4 space-y-4 text-sm">
+              <div>
+                <p className="font-medium">Target changes</p>
+                <div className="mt-2 space-y-2 text-muted">
+                  {data.targetChanges.map((change) => (
+                    <p key={change.id}>
+                      {change.changeAction} · {change.changedByName ?? "System"}
+                    </p>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="font-medium">Template changes</p>
+                <div className="mt-2 space-y-2 text-muted">
+                  {data.templateChanges.map((change) => (
+                    <p key={change.id}>
+                      {change.changeAction} · {change.changedByName ?? "System"}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>

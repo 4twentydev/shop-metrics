@@ -75,6 +75,8 @@ export type MetricTargetInput = {
   effectiveStart: string;
   effectiveEnd: string | null;
   notes: string | null;
+  deletedAt?: Date | null;
+  deletionReason?: string | null;
 };
 
 export type TargetAttainment = {

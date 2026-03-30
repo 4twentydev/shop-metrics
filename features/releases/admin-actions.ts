@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { canTransitionRelease, releaseStatusSchema } from "@/features/releases/status";
+import { syncReleaseReadinessNotifications } from "@/features/releases/readiness-notifications";
 import { writeAuditLog } from "@/lib/audit/log";
 import { requireOpsRole } from "@/lib/auth/permissions";
 import { db } from "@/lib/db";
@@ -54,6 +55,7 @@ export async function updateReleaseAdminAction(formData: FormData) {
     afterState: nextValues,
   });
 
+  await syncReleaseReadinessNotifications();
   revalidatePath("/ops/releases/admin");
   revalidatePath("/ops");
 }

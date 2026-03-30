@@ -16,6 +16,11 @@ import {
   getBusinessDateForShift,
   getDateStringForTimeZone,
 } from "@/features/work-entries/business";
+import {
+  getActiveReadinessNotifications,
+  syncReleaseReadinessNotifications,
+} from "@/features/releases/readiness-notifications";
+import { getReleaseAdminPageData } from "@/features/releases/admin-queries";
 import { db } from "@/lib/db";
 import {
   departments,
@@ -116,21 +121,20 @@ export async function getOrFindCurrentSubmission(userId: string) {
 }
 
 export async function getAvailableReleases() {
-  return db
-    .select({
-      releaseId: jobReleases.id,
-      releaseCode: jobReleases.releaseCode,
-      revisionCode: jobReleases.revisionCode,
-      releaseStatus: jobReleases.status,
-      panelBaseline: jobReleases.panelBaseline,
-      jobNumber: jobs.jobNumber,
-      customerName: jobs.customerName,
-      productName: jobs.productName,
-    })
-    .from(jobReleases)
-    .innerJoin(jobs, eq(jobReleases.jobId, jobs.id))
-    .where(inArray(jobReleases.status, ["READY", "IN_PRODUCTION"]))
-    .orderBy(jobs.jobNumber, jobReleases.releaseCode);
+  const data = await getReleaseAdminPageData();
+
+  return data.releases
+    .filter((release) => release.workEntryAvailable)
+    .map((release) => ({
+      releaseId: release.releaseId,
+      releaseCode: release.releaseCode,
+      revisionCode: release.revisionCode,
+      releaseStatus: release.releaseStatus,
+      panelBaseline: release.panelBaseline,
+      jobNumber: release.jobNumber,
+      customerName: release.customerName,
+      productName: release.productName,
+    }));
 }
 
 export async function getSubmissionEntries(submissionId: string) {
@@ -249,6 +253,7 @@ export async function getEmployeeWorkEntryPageData(userId: string) {
 }
 
 export async function getLeadWorkEntryPageData() {
+  await syncReleaseReadinessNotifications();
   const today = getDateStringForTimeZone(new Date(), "America/Denver");
   const allDepartments = await db
     .select({
@@ -327,6 +332,7 @@ export async function getLeadWorkEntryPageData() {
     submissions: currentSubmissions,
     departmentTotals,
     departments: allDepartments,
+    readinessNotifications: await getActiveReadinessNotifications(),
   };
 }
 

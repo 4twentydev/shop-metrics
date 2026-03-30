@@ -128,6 +128,7 @@ export async function getExtractionReviewPageData(input?: {
             startedAt: releaseExtractionRuns.startedAt,
             completedAt: releaseExtractionRuns.completedAt,
             approvedAt: releaseExtractionRuns.approvedAt,
+            processingMetadata: releaseExtractionRuns.processingMetadata,
             createdByName: users.name,
           })
           .from(releaseExtractionRuns)

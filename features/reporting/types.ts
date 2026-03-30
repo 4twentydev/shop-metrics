@@ -39,6 +39,8 @@ export type SavedReportTemplate = {
   scopeKey: string | null;
   sectionConfig: ReportTemplateConfig;
   isPinned: boolean;
+  deletedAt?: Date | null;
+  deletionReason?: string | null;
 };
 
 export type ReportFilterInput = {

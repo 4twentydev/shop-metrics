@@ -33,6 +33,21 @@ export function LeadWorkEntryView({ data }: LeadWorkEntryViewProps) {
             </p>
             <p className="mt-2 text-2xl font-semibold">{data.businessDate}</p>
           </div>
+          {data.readinessNotifications.length > 0 ? (
+            <div className="mt-4 rounded-2xl border border-warning/50 bg-warning/10 p-4">
+              <p className="text-xs uppercase tracking-[0.2em] text-warning">
+                Release blockers
+              </p>
+              <div className="mt-3 space-y-2 text-sm text-muted">
+                {data.readinessNotifications.slice(0, 5).map((notification) => (
+                  <p key={notification.id}>
+                    {notification.jobNumber} · {notification.releaseCode} ·{" "}
+                    {notification.notificationType.replaceAll("_", " ")}
+                  </p>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

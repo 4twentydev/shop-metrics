@@ -6,6 +6,7 @@ import { fileStorage } from "@/lib/storage";
 
 export async function extractReleaseSummaryWithGemini(input: {
   releaseLabel: string;
+  preprocessingPrompt?: string[];
   documents: Array<{
     id: string;
     fileName: string;
@@ -86,6 +87,7 @@ export async function extractReleaseSummaryWithGemini(input: {
     "Combine information across all supplied PDFs.",
     "Return only structured JSON matching the schema.",
     "Do not invent values. If a field is unclear, use the best concise summary from the docs.",
+    ...(input.preprocessingPrompt ?? []),
     "Document set:",
     ...input.documents.map(
       (document) =>

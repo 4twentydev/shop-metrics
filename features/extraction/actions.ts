@@ -6,11 +6,14 @@ import { revalidatePath } from "next/cache";
 import { extractReleaseSummaryWithGemini } from "@/features/extraction/gemini-service";
 import { releaseExtractionSummarySchema } from "@/features/extraction/normalization";
 import {
+  bulkExtractionSchema,
   readOptionalString,
   retryExtractionSchema,
   reviewExtractionSchema,
   startExtractionSchema,
 } from "@/features/extraction/schemas";
+import { preprocessReleaseDocuments } from "@/features/extraction/preprocessing";
+import { syncReleaseReadinessNotifications } from "@/features/releases/readiness-notifications";
 import { writeAuditLog } from "@/lib/audit/log";
 import { requireOpsRole } from "@/lib/auth/permissions";
 import { db } from "@/lib/db";
@@ -56,6 +59,11 @@ async function runExtraction(input: {
     throw new Error("No current documents are available for extraction.");
   }
 
+  const preprocessed = preprocessReleaseDocuments({
+    releaseLabel: `${release.releaseCode} rev ${release.revisionCode}`,
+    documents: docs,
+  });
+
   const previousRun = await db
     .select({
       attemptNumber: releaseExtractionRuns.attemptNumber,
@@ -74,7 +82,8 @@ async function runExtraction(input: {
       model: env.GEMINI_MODEL,
       status: "PROCESSING",
       attemptNumber: (previousRun[0]?.attemptNumber ?? 0) + 1,
-      sourceDocumentIds: docs.map((doc) => doc.id),
+      sourceDocumentIds: preprocessed.orderedDocuments.map((doc) => doc.id),
+      processingMetadata: preprocessed.processingMetadata,
       createdByUserId: input.createdByUserId,
     })
     .returning({ id: releaseExtractionRuns.id });
@@ -84,7 +93,8 @@ async function runExtraction(input: {
   try {
     const result = await extractReleaseSummaryWithGemini({
       releaseLabel: `${release.releaseCode} rev ${release.revisionCode}`,
-      documents: docs,
+      preprocessingPrompt: preprocessed.promptSections,
+      documents: preprocessed.orderedDocuments,
     });
 
     await db
@@ -115,6 +125,7 @@ async function runExtraction(input: {
       metadata: {
         jobReleaseId: input.jobReleaseId,
         documentCount: docs.length,
+        preprocessing: preprocessed.processingMetadata,
       },
     });
   } catch (error) {
@@ -163,6 +174,7 @@ export async function startReleaseExtractionAction(formData: FormData) {
     createdByUserId: session.user.id,
   });
 
+  await syncReleaseReadinessNotifications();
   revalidatePath("/ops/releases/extraction");
 }
 
@@ -186,6 +198,75 @@ export async function retryReleaseExtractionAction(formData: FormData) {
     createdByUserId: session.user.id,
   });
 
+  await syncReleaseReadinessNotifications();
+  revalidatePath("/ops/releases/extraction");
+}
+
+function readUuidList(formData: FormData, key: string) {
+  return formData
+    .getAll(key)
+    .filter((value): value is string => typeof value === "string")
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+export async function startBulkExtractionAction(formData: FormData) {
+  const session = await requireOpsRole();
+  const parsed = bulkExtractionSchema.parse({
+    jobReleaseIds: readUuidList(formData, "jobReleaseIds"),
+  });
+
+  for (const jobReleaseId of parsed.jobReleaseIds) {
+    await runExtraction({
+      jobReleaseId,
+      createdByUserId: session.user.id,
+    });
+  }
+
+  await writeAuditLog({
+    actorUserId: session.user.id,
+    action: "release-extraction.bulk-started",
+    entityType: "release_extraction_queue",
+    entityId: parsed.jobReleaseIds.join(","),
+    metadata: {
+      releaseCount: parsed.jobReleaseIds.length,
+    },
+  });
+
+  await syncReleaseReadinessNotifications();
+  revalidatePath("/ops/releases/extraction");
+}
+
+export async function retryBulkExtractionAction(formData: FormData) {
+  const session = await requireOpsRole();
+  const parsed = bulkExtractionSchema.parse({
+    jobReleaseIds: readUuidList(formData, "jobReleaseIds"),
+  });
+
+  for (const jobReleaseId of parsed.jobReleaseIds) {
+    const priorRun = await db.query.releaseExtractionRuns.findFirst({
+      where: eq(releaseExtractionRuns.jobReleaseId, jobReleaseId),
+      orderBy: [desc(releaseExtractionRuns.createdAt)],
+    });
+
+    await runExtraction({
+      jobReleaseId,
+      intakeBatchId: priorRun?.intakeBatchId ?? undefined,
+      createdByUserId: session.user.id,
+    });
+  }
+
+  await writeAuditLog({
+    actorUserId: session.user.id,
+    action: "release-extraction.bulk-retried",
+    entityType: "release_extraction_queue",
+    entityId: parsed.jobReleaseIds.join(","),
+    metadata: {
+      releaseCount: parsed.jobReleaseIds.length,
+    },
+  });
+
+  await syncReleaseReadinessNotifications();
   revalidatePath("/ops/releases/extraction");
 }
 
@@ -256,6 +337,7 @@ export async function saveExtractionReviewAction(formData: FormData) {
     },
   });
 
+  await syncReleaseReadinessNotifications();
   revalidatePath("/ops/releases/extraction");
 }
 
@@ -319,6 +401,7 @@ export async function approveExtractionBaselineAction(formData: FormData) {
     },
   });
 
+  await syncReleaseReadinessNotifications();
   revalidatePath("/ops/releases/extraction");
   revalidatePath("/ops/releases/intake");
 }

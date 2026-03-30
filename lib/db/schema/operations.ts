@@ -140,6 +140,23 @@ export const reportPackageTypeEnum = pgEnum("report_package_type", [
   "BUNDLE",
 ]);
 
+export const configChangeActionEnum = pgEnum("config_change_action", [
+  "CREATED",
+  "UPDATED",
+  "SOFT_DELETED",
+  "RESTORED",
+]);
+
+export const readinessNotificationStatusEnum = pgEnum(
+  "readiness_notification_status",
+  ["ACTIVE", "RESOLVED"],
+);
+
+export const readinessNotificationTypeEnum = pgEnum(
+  "readiness_notification_type",
+  ["STALE_BASELINE", "FAILED_EXTRACTION"],
+);
+
 export const shifts = pgTable("shifts", {
   id: uuid("id").defaultRandom().primaryKey(),
   code: varchar("code", { length: 32 }).notNull().unique(),
@@ -482,6 +499,7 @@ export const releaseExtractionRuns = pgTable("release_extraction_runs", {
     .default("PENDING_REVIEW"),
   attemptNumber: integer("attempt_number").notNull().default(1),
   sourceDocumentIds: jsonb("source_document_ids").notNull(),
+  processingMetadata: jsonb("processing_metadata"),
   rawOutput: jsonb("raw_output"),
   normalizedOutput: jsonb("normalized_output"),
   reviewedOutput: jsonb("reviewed_output"),
@@ -522,6 +540,43 @@ export const releaseExtractionRuns = pgTable("release_extraction_runs", {
     .notNull()
     .defaultNow(),
 });
+
+export const releaseReadinessNotifications = pgTable(
+  "release_readiness_notifications",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    jobReleaseId: uuid("job_release_id")
+      .notNull()
+      .references(() => jobReleases.id, { onDelete: "cascade" }),
+    notificationType: readinessNotificationTypeEnum("notification_type").notNull(),
+    status: readinessNotificationStatusEnum("status").notNull().default("ACTIVE"),
+    message: text("message").notNull(),
+    detectedAt: timestamp("detected_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+    resolvedAt: timestamp("resolved_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    lastEvaluatedAt: timestamp("last_evaluated_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+    metadata: jsonb("metadata"),
+  },
+  (table) => [
+    uniqueIndex("release_readiness_notifications_unique_idx").on(
+      table.jobReleaseId,
+      table.notificationType,
+    ),
+    index("release_readiness_notifications_status_idx").on(table.status, table.detectedAt),
+  ],
+);
 
 export const shiftSubmissions = pgTable(
   "shift_submissions",
@@ -719,6 +774,14 @@ export const metricTargets = pgTable(
     effectiveStart: date("effective_start").notNull(),
     effectiveEnd: date("effective_end"),
     notes: text("notes"),
+    deletedAt: timestamp("deleted_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    deletedByUserId: text("deleted_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    deletionReason: text("deletion_reason"),
     enteredByUserId: text("entered_by_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
@@ -742,6 +805,33 @@ export const metricTargets = pgTable(
       table.scopeReferenceId,
       table.scopeKey,
       table.effectiveStart,
+    ),
+  ],
+);
+
+export const metricTargetVersions = pgTable(
+  "metric_target_versions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    metricTargetId: uuid("metric_target_id")
+      .notNull()
+      .references(() => metricTargets.id, { onDelete: "cascade" }),
+    changeAction: configChangeActionEnum("change_action").notNull(),
+    snapshot: jsonb("snapshot").notNull(),
+    changedByUserId: text("changed_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("metric_target_versions_target_idx").on(
+      table.metricTargetId,
+      table.createdAt,
     ),
   ],
 );
@@ -803,6 +893,14 @@ export const reportTemplates = pgTable(
     scopeKey: varchar("scope_key", { length: 128 }),
     sectionConfig: jsonb("section_config").notNull(),
     isPinned: boolean("is_pinned").notNull().default(false),
+    deletedAt: timestamp("deleted_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    deletedByUserId: text("deleted_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    deletionReason: text("deletion_reason"),
     createdByUserId: text("created_by_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
@@ -830,6 +928,134 @@ export const reportTemplates = pgTable(
       table.scopeKey,
     ),
   ],
+);
+
+export const reportTemplateVersions = pgTable(
+  "report_template_versions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    reportTemplateId: uuid("report_template_id")
+      .notNull()
+      .references(() => reportTemplates.id, { onDelete: "cascade" }),
+    changeAction: configChangeActionEnum("change_action").notNull(),
+    snapshot: jsonb("snapshot").notNull(),
+    changedByUserId: text("changed_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("report_template_versions_template_idx").on(
+      table.reportTemplateId,
+      table.createdAt,
+    ),
+  ],
+);
+
+export const displayPlaylists = pgTable(
+  "display_playlists",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: varchar("name", { length: 120 }).notNull(),
+    slug: varchar("slug", { length: 120 }).notNull().unique(),
+    description: text("description"),
+    rotationSeconds: integer("rotation_seconds").notNull().default(20),
+    heartbeatIntervalSeconds: integer("heartbeat_interval_seconds")
+      .notNull()
+      .default(60),
+    isActive: boolean("is_active").notNull().default(true),
+    createdByUserId: text("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    updatedByUserId: text("updated_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("display_playlists_active_idx").on(table.isActive, table.slug),
+  ],
+);
+
+export const displayPlaylistItems = pgTable(
+  "display_playlist_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    playlistId: uuid("playlist_id")
+      .notNull()
+      .references(() => displayPlaylists.id, { onDelete: "cascade" }),
+    templateId: uuid("template_id")
+      .notNull()
+      .references(() => reportTemplates.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("display_playlist_items_unique_idx").on(
+      table.playlistId,
+      table.templateId,
+    ),
+    uniqueIndex("display_playlist_items_position_idx").on(
+      table.playlistId,
+      table.position,
+    ),
+  ],
+);
+
+export const displayScreenHeartbeats = pgTable(
+  "display_screen_heartbeats",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    playlistId: uuid("playlist_id").references(() => displayPlaylists.id, {
+      onDelete: "set null",
+    }),
+    screenKey: varchar("screen_key", { length: 120 }).notNull().unique(),
+    screenLabel: varchar("screen_label", { length: 160 }),
+    lastTemplateSlug: varchar("last_template_slug", { length: 120 }),
+    lastPath: text("last_path"),
+    lastAnchorDate: date("last_anchor_date"),
+    lastSeenAt: timestamp("last_seen_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("display_screen_heartbeats_last_seen_idx").on(table.lastSeenAt)],
 );
 
 export const reportExportDeliveries = pgTable(

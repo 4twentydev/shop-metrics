@@ -4,17 +4,23 @@ import { db } from "@/lib/db";
 import {
   auditLogs,
   departments,
+  displayPlaylistItems,
+  displayPlaylists,
+  displayScreenHeartbeats,
   employeeStationAssignments,
   employees,
   jobDocuments,
   jobReleases,
   jobs,
   metricTargets,
+  metricTargetVersions,
   reportExportDeliveries,
+  reportTemplateVersions,
   reportTemplates,
   releaseComments,
   releaseExtractionRuns,
   releaseIntakeBatches,
+  releaseReadinessNotifications,
   roles,
   shiftSubmissions,
   shifts,
@@ -1039,6 +1045,26 @@ async function main() {
     ])
     .onConflictDoNothing();
 
+  const seededTargets = await db.query.metricTargets.findMany();
+  for (const target of seededTargets) {
+    const existingVersion = await db.query.metricTargetVersions.findFirst({
+      where: eq(metricTargetVersions.metricTargetId, target.id),
+    });
+
+    if (!existingVersion) {
+      await db.insert(metricTargetVersions).values({
+        metricTargetId: target.id,
+        changeAction: "CREATED",
+        snapshot: {
+          metricKey: target.metricKey,
+          targetValue: target.targetValue,
+          scopeKey: target.scopeKey,
+        },
+        changedByUserId: "usr_admin_elward",
+      });
+    }
+  }
+
   await db
     .insert(reportTemplates)
     .values([
@@ -1107,6 +1133,159 @@ async function main() {
     ])
     .onConflictDoNothing();
 
+  const savedTemplates = await db.query.reportTemplates.findMany();
+  for (const template of savedTemplates) {
+    const existingVersion = await db.query.reportTemplateVersions.findFirst({
+      where: eq(reportTemplateVersions.reportTemplateId, template.id),
+    });
+
+    if (!existingVersion) {
+      await db.insert(reportTemplateVersions).values({
+        reportTemplateId: template.id,
+        changeAction: "CREATED",
+        snapshot: {
+          slug: template.slug,
+          viewType: template.viewType,
+          isPinned: template.isPinned,
+        },
+        changedByUserId: template.createdByUserId,
+      });
+    }
+  }
+
+  const archivedTarget = seededTargets.find((target) => target.metricKey === "completion_percentage");
+  if (archivedTarget) {
+    const existingDeletedVersion = await db.query.metricTargetVersions.findFirst({
+      where: and(
+        eq(metricTargetVersions.metricTargetId, archivedTarget.id),
+        eq(metricTargetVersions.changeAction, "SOFT_DELETED"),
+      ),
+    });
+
+    await db
+      .update(metricTargets)
+      .set({
+        deletedAt: now,
+        deletedByUserId: "usr_ops_lead",
+        deletionReason: "Superseded by revised release milestone target.",
+        updatedAt: now,
+      })
+      .where(eq(metricTargets.id, archivedTarget.id));
+
+    if (!existingDeletedVersion) {
+      await db.insert(metricTargetVersions).values({
+        metricTargetId: archivedTarget.id,
+        changeAction: "SOFT_DELETED",
+        snapshot: {
+          metricKey: archivedTarget.metricKey,
+          targetValue: archivedTarget.targetValue,
+          deletionReason: "Superseded by revised release milestone target.",
+        },
+        changedByUserId: "usr_ops_lead",
+      });
+    }
+  }
+
+  const archivedTemplate = savedTemplates.find(
+    (template) => template.slug === "panel-prep-weekly",
+  );
+  if (archivedTemplate) {
+    const existingDeletedVersion = await db.query.reportTemplateVersions.findFirst({
+      where: and(
+        eq(reportTemplateVersions.reportTemplateId, archivedTemplate.id),
+        eq(reportTemplateVersions.changeAction, "SOFT_DELETED"),
+      ),
+    });
+
+    await db
+      .update(reportTemplates)
+      .set({
+        deletedAt: now,
+        deletedByUserId: "usr_ops_lead",
+        deletionReason: "Rolled into pinned rotating display playlists.",
+        updatedAt: now,
+      })
+      .where(eq(reportTemplates.id, archivedTemplate.id));
+
+    if (!existingDeletedVersion) {
+      await db.insert(reportTemplateVersions).values({
+        reportTemplateId: archivedTemplate.id,
+        changeAction: "SOFT_DELETED",
+        snapshot: {
+          slug: archivedTemplate.slug,
+          deletionReason: "Rolled into pinned rotating display playlists.",
+        },
+        changedByUserId: "usr_ops_lead",
+      });
+    }
+  }
+
+  const executiveTemplate = savedTemplates.find(
+    (template) => template.slug === "executive-daily-overview",
+  );
+  const reworkTemplate = savedTemplates.find(
+    (template) => template.slug === "daily-rework-review",
+  );
+
+  if (executiveTemplate && reworkTemplate) {
+    const playlistInsert = await db
+      .insert(displayPlaylists)
+      .values({
+        name: "Shop Floor Executive Rotation",
+        slug: "shop-floor-executive",
+        description: "Rotates executive and rework views for the production wallboard.",
+        rotationSeconds: 25,
+        heartbeatIntervalSeconds: 60,
+        isActive: true,
+        createdByUserId: "usr_admin_elward",
+        updatedByUserId: "usr_admin_elward",
+      })
+      .onConflictDoNothing()
+      .returning({ id: displayPlaylists.id });
+
+    const playlistId =
+      playlistInsert[0]?.id ??
+      (
+        await db.query.displayPlaylists.findFirst({
+          where: eq(displayPlaylists.slug, "shop-floor-executive"),
+        })
+      )?.id;
+
+    if (playlistId) {
+      await db
+        .insert(displayPlaylistItems)
+        .values([
+          {
+            playlistId,
+            templateId: executiveTemplate.id,
+            position: 0,
+          },
+          {
+            playlistId,
+            templateId: reworkTemplate.id,
+            position: 1,
+          },
+        ])
+        .onConflictDoNothing();
+
+      await db
+        .insert(displayScreenHeartbeats)
+        .values({
+          playlistId,
+          screenKey: "shop-floor-east-wall",
+          screenLabel: "Shop Floor East Wall",
+          lastTemplateSlug: executiveTemplate.slug,
+          lastPath: "/display/playlists/shop-floor-executive",
+          lastAnchorDate: "2026-03-29",
+          lastSeenAt: now,
+          metadata: {
+            source: "seed",
+          },
+        })
+        .onConflictDoNothing();
+    }
+  }
+
   await db
     .insert(reportExportDeliveries)
     .values({
@@ -1132,6 +1311,36 @@ async function main() {
     })
     .onConflictDoNothing();
 
+  await db
+    .insert(releaseReadinessNotifications)
+    .values([
+      {
+        jobReleaseId: intakeDemoRelease.id,
+        notificationType: "STALE_BASELINE",
+        status: "ACTIVE",
+        message:
+          "Release RMK1 on job 24032 is blocked because the approved baseline is stale.",
+        detectedAt: now,
+        lastEvaluatedAt: now,
+        metadata: {
+          source: "seed",
+        },
+      },
+      {
+        jobReleaseId: engineeringRelease.id,
+        notificationType: "FAILED_EXTRACTION",
+        status: "ACTIVE",
+        message:
+          "Release RME1 on job 24032 is blocked because the latest extraction run failed.",
+        detectedAt: now,
+        lastEvaluatedAt: now,
+        metadata: {
+          source: "seed",
+        },
+      },
+    ])
+    .onConflictDoNothing();
+
   await db.insert(auditLogs).values({
     actorUserId: "usr_admin_elward",
     action: "seed.completed",
@@ -1140,7 +1349,7 @@ async function main() {
       metadata: {
         users: seededUsers.length,
         departments: 6,
-        version: 6,
+        version: 8,
       },
   });
 

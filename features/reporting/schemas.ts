@@ -44,6 +44,17 @@ export const exportRequestSchema = z.object({
   templateId: z.string().uuid().nullable().optional(),
 });
 
+export const displayPlaylistSchema = z.object({
+  playlistId: z.string().uuid().nullable().optional(),
+  name: z.string().trim().min(3).max(120),
+  slug: z.string().trim().min(3).max(120).regex(/^[a-z0-9-]+$/),
+  description: z.string().trim().max(300).nullable().optional(),
+  rotationSeconds: z.coerce.number().int().min(10).max(300),
+  heartbeatIntervalSeconds: z.coerce.number().int().min(15).max(300),
+  isActive: z.boolean().default(true),
+  templateSlugs: z.string().trim().min(1).max(1000),
+});
+
 export function checkboxValue(formData: FormData, key: string) {
   return formData.get(key) === "on";
 }

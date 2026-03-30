@@ -22,6 +22,10 @@ export const retryExtractionSchema = z.object({
   extractionRunId: z.string().uuid(),
 });
 
+export const bulkExtractionSchema = z.object({
+  jobReleaseIds: z.array(z.string().uuid()).min(1).max(50),
+});
+
 export const extractionQueueFilterSchema = z
   .enum([
     "ALL",

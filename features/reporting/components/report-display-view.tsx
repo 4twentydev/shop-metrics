@@ -12,6 +12,7 @@ type ReportDisplayViewProps = {
   }>;
   templateBasePath: string;
   linkQueryString?: string;
+  hideTemplateNav?: boolean;
 };
 
 export function ReportDisplayView({
@@ -19,6 +20,7 @@ export function ReportDisplayView({
   pinnedTemplates,
   templateBasePath,
   linkQueryString,
+  hideTemplateNav,
 }: ReportDisplayViewProps) {
   return (
     <main className="min-h-screen bg-graphite text-foreground">
@@ -35,22 +37,24 @@ export function ReportDisplayView({
               {data.scopeLabel} · {data.range.windowType} · {data.range.windowStart}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {pinnedTemplates.map((template) => (
-              <Link
-                key={template.id}
-                href={`${templateBasePath}/${template.slug}${linkQueryString ?? ""}`}
-                className={cn(
-                  "rounded-full border px-4 py-2 text-sm font-semibold",
-                  data.activeTemplate?.slug === template.slug
-                    ? "border-accent bg-accent-soft text-white"
-                    : "border-line text-muted",
-                )}
-              >
-                {template.name}
-              </Link>
-            ))}
-          </div>
+          {hideTemplateNav ? null : (
+            <div className="flex flex-wrap gap-2">
+              {pinnedTemplates.map((template) => (
+                <Link
+                  key={template.id}
+                  href={`${templateBasePath}/${template.slug}${linkQueryString ?? ""}`}
+                  className={cn(
+                    "rounded-full border px-4 py-2 text-sm font-semibold",
+                    data.activeTemplate?.slug === template.slug
+                      ? "border-accent bg-accent-soft text-white"
+                      : "border-line text-muted",
+                  )}
+                >
+                  {template.name}
+                </Link>
+              ))}
+            </div>
+          )}
         </header>
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

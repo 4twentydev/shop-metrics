@@ -171,6 +171,7 @@ Conditional:
 - SQL migration: [`drizzle/0005_reporting_dashboards.sql`](./drizzle/0005_reporting_dashboards.sql)
 - SQL migration: [`drizzle/0006_reporting_operations.sql`](./drizzle/0006_reporting_operations.sql)
 - SQL migration: [`drizzle/0007_export_storage.sql`](./drizzle/0007_export_storage.sql)
+- SQL migration: [`drizzle/0008_operational_hardening.sql`](./drizzle/0008_operational_hardening.sql)
 - Seed script: [`scripts/seed.ts`](./scripts/seed.ts)
 
 ## Work-entry routes
@@ -199,6 +200,7 @@ Conditional:
 - Display mode by template: `/ops/reports/display/[templateSlug]`
 - Public display index: `/display?access=DISPLAY_ACCESS_TOKEN`
 - Public display by template: `/display/[templateSlug]?access=DISPLAY_ACCESS_TOKEN`
+- Public display playlist: `/display/playlists/[playlistSlug]?access=DISPLAY_ACCESS_TOKEN`
 - Accountability: `/ops/reports/accountability`
 - Rework: `/ops/reports/rework`
 - Bottlenecks: `/ops/reports/bottlenecks`
@@ -208,6 +210,7 @@ Conditional:
 - Release drilldown: `/ops/reports/releases/[releaseCode]`
 - Exports: `/api/reports/export`
 - Stored export download: `/api/reports/download/[deliveryId]`
+- Display heartbeat ingest: `/api/display/heartbeat`
 
 ## Release intake notes
 
@@ -224,6 +227,8 @@ Conditional:
 
 - Gemini is wrapped behind a server-side abstraction in [`lib/ai/gemini.ts`](./lib/ai/gemini.ts).
 - Extraction runs persist raw model output, normalized structured output, edited reviewed output, confidence, run status, and review status.
+- Extraction preprocessing now orders document families by kind and injects document-type-specific guidance before Gemini sees the release packet.
+- Bulk extraction start and retry actions are available from the extraction queue for selected releases.
 - Extraction combines the release's current document set into one release-level summary.
 - AI output is never auto-approved. Reviewers edit fields first, then explicitly approve the baseline.
 - Revised uploads can keep a release in stale-baseline review until a reviewed extraction run is approved.
@@ -233,7 +238,9 @@ Conditional:
 
 - Employees append entries to the same job release during a shift.
 - Station, department, shift, business date, native unit type, and panel normalization derive from the active assignment.
+- Employee release availability now follows release-readiness rules, so stale-baseline and failed-extraction releases stay blocked from work-entry.
 - Leads verify in-flight work, leave comments, and see cross-department totals only on the lead route.
+- Active release-readiness notifications are surfaced on the lead work-entry route when stale baselines or failed extractions are blocking production.
 - Submit-all locks the submission and all child entries.
 - Reopen requires a reason and is written to the audit log.
 - Entry edits are versioned and marked with editor and reason.
@@ -254,11 +261,13 @@ Conditional:
 
 - Report generation is centralized under [`features/reporting`](./features/reporting).
 - Saved templates are persisted in `report_templates` and support configurable summary/raw/pivot visibility.
+- Metric targets and report templates now use recoverable soft deletes plus version tables for admin audit and rollback workflows.
 - Export formats currently supported by the route handler are CSV, Excel-compatible SpreadsheetML XML, PDF, and web view.
 - Export deliveries are logged to `report_export_deliveries` for admin history review.
 - Historical export retrieval is supported when a delivery has a stored artifact and can be downloaded from the delivery history table.
 - Scheduled reporting is wired through [`app/api/cron/reporting/route.ts`](./app/api/cron/reporting/route.ts) and [`vercel.json`](./vercel.json).
 - Public display mode is token-gated through `DISPLAY_ACCESS_TOKEN`; ops-authenticated display routes remain available for internal review.
+- Kiosk rotation playlists are stored in `display_playlists` and `display_playlist_items`, while live screen presence is tracked through `display_screen_heartbeats`.
 - Dashboard views are mobile-usable, desktop-optimized, and use restrained Motion only for entrance and tab transitions.
 - Future display-screen mode notes: [`features/reporting/display-mode-notes.md`](./features/reporting/display-mode-notes.md)
 
@@ -273,7 +282,7 @@ Conditional:
 
 Implement the next operational hardening slice:
 
-- target/template activity audit trails and soft-delete recovery if historical rollback is required
-- extraction queue bulk actions and document-family-specific preprocessing before Gemini submission
-- kiosk rotation playlists, screen heartbeat monitoring, and display-specific observability
-- release readiness notifications when stale baselines or failed extraction runs block work-entry
+- extraction reviewer bulk approve/reject workflows with clearer failure triage
+- kiosk-safe ops preview routes and playlist scheduling by shift or department
+- notification delivery channels beyond in-app ops surfaces
+- export bundle archives if historical multi-file packages must be re-downloaded intact

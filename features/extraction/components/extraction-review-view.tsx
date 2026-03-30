@@ -2,8 +2,10 @@ import Link from "next/link";
 
 import {
   approveExtractionBaselineAction,
+  retryBulkExtractionAction,
   retryReleaseExtractionAction,
   saveExtractionReviewAction,
+  startBulkExtractionAction,
   startReleaseExtractionAction,
 } from "@/features/extraction/actions";
 import type { ExtractionReviewPageData } from "@/features/extraction/queries";
@@ -20,6 +22,25 @@ function asArray(value: unknown) {
 export function ExtractionReviewView({ data }: ExtractionReviewViewProps) {
   return (
     <main className="space-y-6 p-6">
+      <section className="flex flex-wrap gap-3">
+        <form action={startBulkExtractionAction} id="bulk-start-form">
+          <button
+            type="submit"
+            className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-black"
+          >
+            Start selected extractions
+          </button>
+        </form>
+        <form action={retryBulkExtractionAction} id="bulk-retry-form">
+          <button
+            type="submit"
+            className="rounded-full border border-line px-4 py-2 text-sm font-semibold"
+          >
+            Retry selected releases
+          </button>
+        </form>
+      </section>
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {[
           {
@@ -110,6 +131,15 @@ export function ExtractionReviewView({ data }: ExtractionReviewViewProps) {
           >
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
+                <label className="mb-3 inline-flex items-center gap-3 rounded-full border border-line px-4 py-2 text-xs uppercase tracking-[0.2em] text-muted">
+                  <input
+                    type="checkbox"
+                    name="jobReleaseIds"
+                    value={release.releaseId}
+                    form={release.queueState === "FAILED" ? "bulk-retry-form" : "bulk-start-form"}
+                  />
+                  Select
+                </label>
                 <p className="font-mono text-xs uppercase tracking-[0.32em] text-accent">
                   Extraction review
                 </p>
@@ -183,6 +213,16 @@ export function ExtractionReviewView({ data }: ExtractionReviewViewProps) {
                           <p className="mt-1 text-muted">
                             {run.provider} · {run.model}
                           </p>
+                          {run.processingMetadata ? (
+                            <p className="mt-2 text-muted">
+                              Preprocessed {String((run.processingMetadata as { documentCount?: number }).documentCount ?? 0)} docs · families{" "}
+                              {Array.isArray(
+                                (run.processingMetadata as { families?: unknown[] }).families,
+                              )
+                                ? (run.processingMetadata as { families: string[] }).families.join(", ")
+                                : "n/a"}
+                            </p>
+                          ) : null}
                           {run.errorMessage ? (
                             <p className="mt-2 text-warning">{run.errorMessage}</p>
                           ) : null}

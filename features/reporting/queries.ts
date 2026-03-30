@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import {
@@ -31,6 +31,7 @@ export async function getSavedReportTemplates() {
       isPinned: reportTemplates.isPinned,
     })
     .from(reportTemplates)
+    .where(isNull(reportTemplates.deletedAt))
     .orderBy(desc(reportTemplates.isPinned), asc(reportTemplates.name));
 
   return rows as SavedReportTemplate[];
@@ -52,7 +53,7 @@ export async function getPinnedReportTemplates() {
       isPinned: reportTemplates.isPinned,
     })
     .from(reportTemplates)
-    .where(eq(reportTemplates.isPinned, true))
+    .where(and(eq(reportTemplates.isPinned, true), isNull(reportTemplates.deletedAt)))
     .orderBy(asc(reportTemplates.name));
 
   return rows as SavedReportTemplate[];
@@ -60,7 +61,7 @@ export async function getPinnedReportTemplates() {
 
 export async function getReportTemplateById(templateId: string) {
   const row = await db.query.reportTemplates.findFirst({
-    where: eq(reportTemplates.id, templateId),
+    where: and(eq(reportTemplates.id, templateId), isNull(reportTemplates.deletedAt)),
   });
 
   return (row as SavedReportTemplate | undefined) ?? null;
