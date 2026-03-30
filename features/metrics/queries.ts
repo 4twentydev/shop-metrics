@@ -1,7 +1,6 @@
 import "server-only";
 
 import {
-  aliasedTable,
   and,
   desc,
   eq,
@@ -12,6 +11,7 @@ import {
   or,
   sql,
 } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 import { db } from "@/lib/db";
 import {
@@ -33,8 +33,8 @@ import type {
   MetricSourceRow,
 } from "./types";
 
-const faultDepartments = aliasedTable(departments, "fault_departments");
-const fixingDepartments = aliasedTable(departments, "fixing_departments");
+const faultDepartments = alias(departments, "fault_departments");
+const fixingDepartments = alias(departments, "fixing_departments");
 
 function toNumber(value: string | number | null | undefined) {
   if (value === null || value === undefined) {
