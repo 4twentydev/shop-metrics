@@ -42,7 +42,7 @@ export function ReportDisplayView({
               {pinnedTemplates.map((template) => (
                 <Link
                   key={template.id}
-                  href={`${templateBasePath}/${template.slug}${linkQueryString ?? ""}`}
+                  href={`${templateBasePath}/${template.slug}${linkQueryString ?? ""}` as Parameters<typeof Link>[0]["href"]}
                   className={cn(
                     "rounded-full border px-4 py-2 text-sm font-semibold",
                     data.activeTemplate?.slug === template.slug
