@@ -24,14 +24,14 @@ export async function runScheduledReportingOperations(input: {
     windows.includes("ANNUAL")
       ? await runMetricSnapshotBackfill({
           anchorBusinessDate: input.anchorDate,
-          actorUserId: input.actorUserId,
+          actorUserId: input.actorUserId ?? null,
         })
       : await Promise.all(
           windows.map((windowType) =>
             runMetricSnapshotJob({
               windowType,
               anchorBusinessDate: input.anchorDate,
-              actorUserId: input.actorUserId,
+              actorUserId: input.actorUserId ?? null,
             }),
           ),
         );
@@ -49,7 +49,7 @@ export async function runScheduledReportingOperations(input: {
       report,
       format: "csv",
       dataset: "summary",
-      actorUserId: input.actorUserId,
+      actorUserId: input.actorUserId ?? null,
     });
     const checksumSha256 = createHash("sha256")
       .update(typeof artifact.body === "string" ? artifact.body : artifact.body)

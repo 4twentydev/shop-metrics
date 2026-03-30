@@ -169,7 +169,7 @@ export function ReportDashboardView({ data }: ReportDashboardViewProps) {
               data.templates.slice(0, 5).map((template) => (
                 <Link
                   key={template.id}
-                  href={buildTemplateHref(template)}
+                  href={buildTemplateHref(template) as Parameters<typeof Link>[0]["href"]}
                   className={cn(
                     "rounded-2xl border px-4 py-4 text-sm transition hover:border-accent",
                     data.activeTemplate?.id === template.id
@@ -317,7 +317,7 @@ export function ReportDashboardView({ data }: ReportDashboardViewProps) {
               {data.links.map((link) => (
                 <Link
                   key={link.href}
-                  href={link.href}
+                  href={link.href as Parameters<typeof Link>[0]["href"]}
                   className="rounded-2xl border border-line/80 bg-white/[0.03] px-4 py-4 text-sm transition hover:border-accent"
                 >
                   {link.label}

@@ -13,7 +13,7 @@ export class VercelBlobStorage implements FileStorage {
       {
         access: "private",
         contentType: input.contentType,
-        token: env.BLOB_READ_WRITE_TOKEN,
+        ...(env.BLOB_READ_WRITE_TOKEN !== undefined ? { token: env.BLOB_READ_WRITE_TOKEN } : {}),
         addRandomSuffix: false,
       },
     );
@@ -35,7 +35,7 @@ export class VercelBlobStorage implements FileStorage {
 
   async readPdf(storageKey: string) {
     const blob = await head(storageKey, {
-      token: env.BLOB_READ_WRITE_TOKEN,
+      ...(env.BLOB_READ_WRITE_TOKEN !== undefined ? { token: env.BLOB_READ_WRITE_TOKEN } : {}),
     });
     const response = await fetch(blob.downloadUrl);
 
@@ -52,7 +52,7 @@ export class VercelBlobStorage implements FileStorage {
 
   async readFile(storageKey: string) {
     const blob = await head(storageKey, {
-      token: env.BLOB_READ_WRITE_TOKEN,
+      ...(env.BLOB_READ_WRITE_TOKEN !== undefined ? { token: env.BLOB_READ_WRITE_TOKEN } : {}),
     });
     const response = await fetch(blob.downloadUrl);
 
