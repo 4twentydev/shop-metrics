@@ -18,7 +18,9 @@ export default async function ReleaseExtractionPage({ searchParams }: PageProps)
   await requireOpsRole();
   const resolvedSearchParams = await searchParams;
   const data = await getExtractionReviewPageData({
-    queue: resolvedSearchParams.queue,
+    ...(resolvedSearchParams.queue !== undefined && {
+      queue: resolvedSearchParams.queue,
+    }),
   });
 
   return <ExtractionReviewView data={data} />;
