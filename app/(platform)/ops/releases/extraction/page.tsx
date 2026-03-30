@@ -8,9 +8,18 @@ export const metadata: Metadata = {
   title: "Release Extraction Review",
 };
 
-export default async function ReleaseExtractionPage() {
+type PageProps = {
+  searchParams: Promise<{
+    queue?: string;
+  }>;
+};
+
+export default async function ReleaseExtractionPage({ searchParams }: PageProps) {
   await requireOpsRole();
-  const data = await getExtractionReviewPageData();
+  const resolvedSearchParams = await searchParams;
+  const data = await getExtractionReviewPageData({
+    queue: resolvedSearchParams.queue,
+  });
 
   return <ExtractionReviewView data={data} />;
 }

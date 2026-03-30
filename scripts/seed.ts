@@ -10,6 +10,7 @@ import {
   jobReleases,
   jobs,
   metricTargets,
+  reportExportDeliveries,
   reportTemplates,
   releaseComments,
   releaseExtractionRuns,
@@ -1104,6 +1105,31 @@ async function main() {
         updatedByUserId: "usr_department_lead",
       },
     ])
+    .onConflictDoNothing();
+
+  await db
+    .insert(reportExportDeliveries)
+    .values({
+      reportView: "EXECUTIVE",
+      windowType: "DAILY",
+      windowStart: "2026-03-29",
+      windowEnd: "2026-03-29",
+      scopeType: "COMPANY",
+      scopeKey: "ELWARD_SYSTEMS",
+      packageType: "SINGLE",
+      requestedFormats: ["csv"],
+      requestedDatasets: ["summary"],
+      packageManifest: {
+        source: "seed",
+        route: "/api/reports/export",
+      },
+      primaryFileName: "executive-daily-2026-03-29-summary.csv",
+      primaryContentType: "text/csv; charset=utf-8",
+      byteSize: 512,
+      rowCount: 4,
+      requestedByUserId: "usr_ops_lead",
+      deliveredAt: now,
+    })
     .onConflictDoNothing();
 
   await db.insert(auditLogs).values({

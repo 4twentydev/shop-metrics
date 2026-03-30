@@ -114,3 +114,29 @@ export async function saveReportTemplateAction(formData: FormData) {
 
   revalidatePath("/ops/reports");
 }
+
+export async function deleteReportTemplateAction(formData: FormData) {
+  const session = await requireOpsRole();
+  const templateId = String(formData.get("templateId") ?? "");
+
+  const existing = await db.query.reportTemplates.findFirst({
+    where: eq(reportTemplates.id, templateId),
+  });
+
+  if (!existing) {
+    throw new Error("Template not found.");
+  }
+
+  await db.delete(reportTemplates).where(eq(reportTemplates.id, templateId));
+
+  await writeAuditLog({
+    actorUserId: session.user.id,
+    action: "report-template.deleted",
+    entityType: "report_template",
+    entityId: templateId,
+    beforeState: existing,
+  });
+
+  revalidatePath("/ops/reports");
+  revalidatePath("/ops/reports/admin");
+}

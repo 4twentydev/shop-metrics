@@ -1,0 +1,20 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/reporting?mode=daily",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/reporting?mode=weekly",
+      "schedule": "15 3 * * 1"
+    },
+    {
+      "path": "/api/cron/reporting?mode=monthly",
+      "schedule": "30 3 1 * *"
+    },
+    {
+      "path": "/api/cron/reporting?mode=annual",
+      "schedule": "45 3 1 1 *"
+    }
+  ]
+}

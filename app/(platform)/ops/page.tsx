@@ -53,6 +53,12 @@ export default async function OpsPage() {
           Open release intake review
         </Link>
         <Link
+          href="/ops/releases/admin"
+          className="mt-3 inline-flex rounded-full border border-line px-5 py-3 text-sm font-semibold"
+        >
+          Open release administration
+        </Link>
+        <Link
           href="/ops/releases/extraction"
           className="mt-3 inline-flex rounded-full border border-line px-5 py-3 text-sm font-semibold"
         >
@@ -63,6 +69,18 @@ export default async function OpsPage() {
           className="mt-3 inline-flex rounded-full border border-line px-5 py-3 text-sm font-semibold"
         >
           Open reporting dashboards
+        </Link>
+        <Link
+          href="/ops/reports/admin"
+          className="mt-3 inline-flex rounded-full border border-line px-5 py-3 text-sm font-semibold"
+        >
+          Open reporting admin
+        </Link>
+        <Link
+          href="/ops/reports/display"
+          className="mt-3 inline-flex rounded-full border border-line px-5 py-3 text-sm font-semibold"
+        >
+          Open display mode
         </Link>
       </section>
 

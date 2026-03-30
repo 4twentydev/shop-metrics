@@ -2,6 +2,7 @@ import "server-only";
 
 import { desc, eq, inArray } from "drizzle-orm";
 
+import { extractionQueueFilterSchema } from "@/features/extraction/schemas";
 import { db } from "@/lib/db";
 import {
   jobDocuments,
@@ -12,7 +13,47 @@ import {
   users,
 } from "@/lib/db/schema";
 
-export async function getExtractionReviewPageData() {
+function getQueueState(input: {
+  baselineStaleAt: Date | null;
+  handoffReadyCount: number;
+  latestRun:
+    | {
+        status: string;
+        reviewStatus: string;
+      }
+    | null;
+}) {
+  if (input.baselineStaleAt) {
+    return "STALE_BASELINE" as const;
+  }
+
+  if (input.latestRun?.status === "FAILED") {
+    return "FAILED" as const;
+  }
+
+  if (
+    input.latestRun?.status === "SUCCEEDED" &&
+    input.latestRun.reviewStatus !== "APPROVED"
+  ) {
+    return "PENDING_REVIEW" as const;
+  }
+
+  if (input.handoffReadyCount > 0) {
+    return "READY" as const;
+  }
+
+  if (input.latestRun?.reviewStatus === "APPROVED") {
+    return "APPROVED" as const;
+  }
+
+  return "WAITING" as const;
+}
+
+export async function getExtractionReviewPageData(input?: {
+  queue?: string;
+}) {
+  const activeQueue =
+    extractionQueueFilterSchema.safeParse(input?.queue ?? "ALL").data ?? "ALL";
   const releases = await db
     .select({
       releaseId: jobReleases.id,
@@ -95,15 +136,55 @@ export async function getExtractionReviewPageData() {
           .orderBy(desc(releaseExtractionRuns.createdAt))
       : [];
 
-  return {
-    releases: releases.map((release) => ({
+  const mappedReleases = releases.map((release) => {
+    const releaseBatches = batches.filter((batch) => batch.jobReleaseId === release.releaseId);
+    const releaseDocuments = documents.filter(
+      (document) => document.jobReleaseId === release.releaseId,
+    );
+    const releaseRuns = runs.filter((run) => run.jobReleaseId === release.releaseId);
+    const handoffReadyCount = releaseBatches.filter(
+      (batch) => batch.status === "HANDOFF_READY",
+    ).length;
+    const latestRun = releaseRuns[0] ?? null;
+    const queueState = getQueueState({
+      baselineStaleAt: release.baselineStaleAt,
+      handoffReadyCount,
+      latestRun,
+    });
+
+    return {
       ...release,
-      batches: batches.filter((batch) => batch.jobReleaseId === release.releaseId),
-      documents: documents.filter(
-        (document) => document.jobReleaseId === release.releaseId,
-      ),
-      runs: runs.filter((run) => run.jobReleaseId === release.releaseId),
-    })),
+      batches: releaseBatches,
+      documents: releaseDocuments,
+      runs: releaseRuns,
+      handoffReadyCount,
+      currentDocumentCount: releaseDocuments.filter((document) => document.isCurrent).length,
+      queueState,
+      latestRun,
+    };
+  });
+
+  const queueSummary = {
+    ALL: mappedReleases.length,
+    READY: mappedReleases.filter((release) => release.queueState === "READY").length,
+    PENDING_REVIEW: mappedReleases.filter(
+      (release) => release.queueState === "PENDING_REVIEW",
+    ).length,
+    FAILED: mappedReleases.filter((release) => release.queueState === "FAILED").length,
+    STALE_BASELINE: mappedReleases.filter(
+      (release) => release.queueState === "STALE_BASELINE",
+    ).length,
+    APPROVED: mappedReleases.filter((release) => release.queueState === "APPROVED").length,
+    WAITING: mappedReleases.filter((release) => release.queueState === "WAITING").length,
+  } as const;
+
+  return {
+    activeQueue,
+    queueSummary,
+    releases:
+      activeQueue === "ALL"
+        ? mappedReleases
+        : mappedReleases.filter((release) => release.queueState === activeQueue),
   };
 }
 

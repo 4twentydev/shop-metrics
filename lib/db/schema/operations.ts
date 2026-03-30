@@ -130,6 +130,16 @@ export const reportViewEnum = pgEnum("report_view", [
   "BOTTLENECK",
 ]);
 
+export const reportDeliveryStatusEnum = pgEnum("report_delivery_status", [
+  "GENERATED",
+  "FAILED",
+]);
+
+export const reportPackageTypeEnum = pgEnum("report_package_type", [
+  "SINGLE",
+  "BUNDLE",
+]);
+
 export const shifts = pgTable("shifts", {
   id: uuid("id").defaultRandom().primaryKey(),
   code: varchar("code", { length: 32 }).notNull().unique(),
@@ -817,6 +827,60 @@ export const reportTemplates = pgTable(
       table.viewType,
       table.scopeType,
       table.scopeReferenceId,
+      table.scopeKey,
+    ),
+  ],
+);
+
+export const reportExportDeliveries = pgTable(
+  "report_export_deliveries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    reportView: reportViewEnum("report_view").notNull(),
+    windowType: metricWindowEnum("window_type").notNull(),
+    windowStart: date("window_start").notNull(),
+    windowEnd: date("window_end").notNull(),
+    scopeType: metricScopeEnum("scope_type"),
+    scopeReferenceId: uuid("scope_reference_id"),
+    scopeKey: varchar("scope_key", { length: 128 }),
+    templateId: uuid("template_id").references(() => reportTemplates.id, {
+      onDelete: "set null",
+    }),
+    packageType: reportPackageTypeEnum("package_type")
+      .notNull()
+      .default("SINGLE"),
+    requestedFormats: jsonb("requested_formats").notNull(),
+    requestedDatasets: jsonb("requested_datasets").notNull(),
+    packageManifest: jsonb("package_manifest").notNull(),
+    status: reportDeliveryStatusEnum("status").notNull().default("GENERATED"),
+    primaryFileName: varchar("primary_file_name", { length: 255 }),
+    primaryContentType: varchar("primary_content_type", { length: 128 }),
+    storageProvider: varchar("storage_provider", { length: 32 }),
+    storageKey: text("storage_key"),
+    storageUrl: text("storage_url"),
+    byteSize: integer("byte_size"),
+    rowCount: integer("row_count").notNull().default(0),
+    errorMessage: text("error_message"),
+    requestedByUserId: text("requested_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    deliveredAt: timestamp("delivered_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("report_export_deliveries_window_idx").on(
+      table.reportView,
+      table.windowType,
+      table.windowStart,
+      table.scopeType,
       table.scopeKey,
     ),
   ],

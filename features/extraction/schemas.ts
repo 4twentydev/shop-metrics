@@ -22,6 +22,18 @@ export const retryExtractionSchema = z.object({
   extractionRunId: z.string().uuid(),
 });
 
+export const extractionQueueFilterSchema = z
+  .enum([
+    "ALL",
+    "READY",
+    "PENDING_REVIEW",
+    "FAILED",
+    "STALE_BASELINE",
+    "APPROVED",
+    "WAITING",
+  ])
+  .default("ALL");
+
 export function readOptionalString(
   formData: FormData,
   key: string,

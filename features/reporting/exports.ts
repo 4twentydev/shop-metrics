@@ -1,6 +1,9 @@
 import "server-only";
 
 import { writeAuditLog } from "@/lib/audit/log";
+import { db } from "@/lib/db";
+import { reportExportDeliveries } from "@/lib/db/schema";
+import { fileStorage } from "@/lib/storage";
 import { formatNumber } from "@/lib/utils";
 
 import type { ReportDataset, ReportExportFormat, ReportViewModel } from "./types";
@@ -211,4 +214,70 @@ export async function buildExportArtifact(input: {
     contentType: "text/plain; charset=utf-8",
     fileName: `${slugBase}-${input.dataset}.txt`,
   };
+}
+
+export async function recordReportDelivery(input: {
+  report: ReportViewModel;
+  templateId?: string | null;
+  packageType: "SINGLE" | "BUNDLE";
+  requestedFormats: ReportExportFormat[];
+  requestedDatasets: ReportDataset[];
+  primaryFileName: string;
+  primaryContentType: string;
+  byteSize: number;
+  rowCount: number;
+  packageManifest: Record<string, unknown>;
+  storageProvider?: string | null;
+  storageKey?: string | null;
+  storageUrl?: string | null;
+  requestedByUserId?: string | null;
+}) {
+  const inserted = await db
+    .insert(reportExportDeliveries)
+    .values({
+      reportView: input.report.view,
+      windowType: input.report.range.windowType,
+      windowStart: input.report.range.windowStart,
+      windowEnd: input.report.range.windowEnd,
+      scopeType: input.report.templateDefaults.scopeType,
+      scopeKey: input.report.templateDefaults.scopeKey,
+      templateId: input.templateId ?? null,
+      packageType: input.packageType,
+      requestedFormats: input.requestedFormats,
+      requestedDatasets: input.requestedDatasets,
+      packageManifest: input.packageManifest,
+      primaryFileName: input.primaryFileName,
+      primaryContentType: input.primaryContentType,
+      storageProvider: input.storageProvider ?? null,
+      storageKey: input.storageKey ?? null,
+      storageUrl: input.storageUrl ?? null,
+      byteSize: input.byteSize,
+      rowCount: input.rowCount,
+      requestedByUserId: input.requestedByUserId ?? null,
+      deliveredAt: new Date(),
+    })
+    .returning({ id: reportExportDeliveries.id });
+
+  return inserted[0]!;
+}
+
+export async function storeReportArtifact(input: {
+  fileName: string;
+  contentType: string;
+  body: string | Buffer;
+  checksumSha256: string;
+  reportView: string;
+  windowType: string;
+  windowStart: string;
+}) {
+  const buffer =
+    typeof input.body === "string" ? Buffer.from(input.body, "utf-8") : input.body;
+
+  return fileStorage.storeFile({
+    buffer,
+    checksumSha256: input.checksumSha256,
+    contentType: input.contentType,
+    fileName: input.fileName,
+    namespace: `report-exports/${input.reportView.toLowerCase()}/${input.windowType.toLowerCase()}/${input.windowStart}`,
+  });
 }

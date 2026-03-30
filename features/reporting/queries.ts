@@ -36,6 +36,28 @@ export async function getSavedReportTemplates() {
   return rows as SavedReportTemplate[];
 }
 
+export async function getPinnedReportTemplates() {
+  const rows = await db
+    .select({
+      id: reportTemplates.id,
+      name: reportTemplates.name,
+      slug: reportTemplates.slug,
+      description: reportTemplates.description,
+      viewType: reportTemplates.viewType,
+      defaultWindowType: reportTemplates.defaultWindowType,
+      scopeType: reportTemplates.scopeType,
+      scopeReferenceId: reportTemplates.scopeReferenceId,
+      scopeKey: reportTemplates.scopeKey,
+      sectionConfig: reportTemplates.sectionConfig,
+      isPinned: reportTemplates.isPinned,
+    })
+    .from(reportTemplates)
+    .where(eq(reportTemplates.isPinned, true))
+    .orderBy(asc(reportTemplates.name));
+
+  return rows as SavedReportTemplate[];
+}
+
 export async function getReportTemplateById(templateId: string) {
   const row = await db.query.reportTemplates.findFirst({
     where: eq(reportTemplates.id, templateId),

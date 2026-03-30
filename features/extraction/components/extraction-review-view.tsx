@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import {
   approveExtractionBaselineAction,
   retryReleaseExtractionAction,
@@ -18,6 +20,62 @@ function asArray(value: unknown) {
 export function ExtractionReviewView({ data }: ExtractionReviewViewProps) {
   return (
     <main className="space-y-6 p-6">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {[
+          {
+            label: "Ready",
+            value: data.queueSummary.READY,
+            href: "/ops/releases/extraction?queue=READY",
+          },
+          {
+            label: "Pending review",
+            value: data.queueSummary.PENDING_REVIEW,
+            href: "/ops/releases/extraction?queue=PENDING_REVIEW",
+          },
+          {
+            label: "Failed",
+            value: data.queueSummary.FAILED,
+            href: "/ops/releases/extraction?queue=FAILED",
+          },
+          {
+            label: "Stale baseline",
+            value: data.queueSummary.STALE_BASELINE,
+            href: "/ops/releases/extraction?queue=STALE_BASELINE",
+          },
+        ].map((card) => (
+          <Link
+            key={card.label}
+            href={card.href}
+            className="rounded-[1.75rem] border border-line/80 bg-panel-strong p-6"
+          >
+            <p className="text-sm text-muted">{card.label}</p>
+            <p className="mt-3 text-4xl font-semibold">{card.value}</p>
+          </Link>
+        ))}
+      </section>
+
+      <section className="flex flex-wrap gap-3">
+        {["ALL", "READY", "PENDING_REVIEW", "FAILED", "STALE_BASELINE", "APPROVED", "WAITING"].map(
+          (queue) => (
+            <Link
+              key={queue}
+              href={
+                queue === "ALL"
+                  ? "/ops/releases/extraction"
+                  : `/ops/releases/extraction?queue=${queue}`
+              }
+              className={`rounded-full border px-4 py-2 text-sm font-semibold ${
+                data.activeQueue === queue
+                  ? "border-accent bg-accent-soft text-white"
+                  : "border-line text-muted"
+              }`}
+            >
+              {queue.replaceAll("_", " ")}
+            </Link>
+          ),
+        )}
+      </section>
+
       {data.releases.map((release) => {
         const latestRun = release.runs[0];
         const latestReviewableRun =
@@ -59,6 +117,18 @@ export function ExtractionReviewView({ data }: ExtractionReviewViewProps) {
                   Job {release.jobNumber} · {release.releaseCode} rev {release.revisionCode}
                 </h2>
                 <p className="mt-2 text-sm text-muted">{release.productName}</p>
+                <p className="mt-2 text-sm text-muted">
+                  Queue state:{" "}
+                  <span className="font-semibold text-foreground">
+                    {release.queueState.replaceAll("_", " ")}
+                  </span>
+                </p>
+                <Link
+                  href={`/ops/releases/admin/${release.releaseId}`}
+                  className="mt-3 inline-flex text-sm font-semibold text-accent"
+                >
+                  Open release admin detail
+                </Link>
               </div>
               <div className="space-y-2 text-right text-sm">
                 <div>
@@ -68,7 +138,13 @@ export function ExtractionReviewView({ data }: ExtractionReviewViewProps) {
                     : "Not approved"}
                 </div>
                 <div className={release.baselineStaleAt ? "text-warning" : "text-muted"}>
-                  {release.baselineStaleAt ? "Stale baseline review required" : "Baseline current"}
+                  {release.baselineStaleAt
+                    ? "Stale baseline review required"
+                    : "Baseline current"}
+                </div>
+                <div className="text-muted">
+                  Current docs {release.currentDocumentCount} · handoff ready{" "}
+                  {release.handoffReadyCount}
                 </div>
               </div>
             </div>
@@ -295,6 +371,11 @@ export function ExtractionReviewView({ data }: ExtractionReviewViewProps) {
           </article>
         );
       })}
+      {data.releases.length === 0 ? (
+        <section className="rounded-[1.75rem] border border-line/80 bg-panel-strong p-6 text-sm text-muted">
+          No releases matched the current extraction queue filter.
+        </section>
+      ) : null}
     </main>
   );
 }

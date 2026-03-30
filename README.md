@@ -22,6 +22,7 @@ Production foundation for a panel-centric manufacturing metrics platform built o
 - Gemini extraction review vertical slice
 - Snapshot-based metrics engine with targets and tested formulas
 - Reporting dashboards, configurable templates, and multi-format exports
+- Scheduled reporting operations, delivery history, and display-screen mode
 
 ## Architecture notes
 
@@ -98,6 +99,10 @@ Conditional:
   - `vercel-blob` for production
 - `BLOB_READ_WRITE_TOKEN`
   - required when `STORAGE_DRIVER=vercel-blob`
+- `CRON_SECRET`
+  - recommended in production to secure Vercel Cron routes
+- `DISPLAY_ACCESS_TOKEN`
+  - required if you want to expose the kiosk/display route outside ops auth
 
 ## Local development
 
@@ -164,6 +169,8 @@ Conditional:
 - SQL migration: [`drizzle/0003_gemini_release_extraction.sql`](./drizzle/0003_gemini_release_extraction.sql)
 - SQL migration: [`drizzle/0004_metrics_engine.sql`](./drizzle/0004_metrics_engine.sql)
 - SQL migration: [`drizzle/0005_reporting_dashboards.sql`](./drizzle/0005_reporting_dashboards.sql)
+- SQL migration: [`drizzle/0006_reporting_operations.sql`](./drizzle/0006_reporting_operations.sql)
+- SQL migration: [`drizzle/0007_export_storage.sql`](./drizzle/0007_export_storage.sql)
 - Seed script: [`scripts/seed.ts`](./scripts/seed.ts)
 
 ## Work-entry routes
@@ -179,9 +186,19 @@ Conditional:
 
 - Admin / lead route: `/ops/releases/extraction`
 
+## Release administration routes
+
+- Release administration board: `/ops/releases/admin`
+- Release administration detail: `/ops/releases/admin/[releaseId]`
+
 ## Reporting routes
 
 - Executive overview: `/ops/reports`
+- Reporting admin: `/ops/reports/admin`
+- Display mode index: `/ops/reports/display`
+- Display mode by template: `/ops/reports/display/[templateSlug]`
+- Public display index: `/display?access=DISPLAY_ACCESS_TOKEN`
+- Public display by template: `/display/[templateSlug]?access=DISPLAY_ACCESS_TOKEN`
 - Accountability: `/ops/reports/accountability`
 - Rework: `/ops/reports/rework`
 - Bottlenecks: `/ops/reports/bottlenecks`
@@ -190,6 +207,7 @@ Conditional:
 - Job drilldown: `/ops/reports/jobs/[jobNumber]`
 - Release drilldown: `/ops/reports/releases/[releaseCode]`
 - Exports: `/api/reports/export`
+- Stored export download: `/api/reports/download/[deliveryId]`
 
 ## Release intake notes
 
@@ -237,6 +255,10 @@ Conditional:
 - Report generation is centralized under [`features/reporting`](./features/reporting).
 - Saved templates are persisted in `report_templates` and support configurable summary/raw/pivot visibility.
 - Export formats currently supported by the route handler are CSV, Excel-compatible SpreadsheetML XML, PDF, and web view.
+- Export deliveries are logged to `report_export_deliveries` for admin history review.
+- Historical export retrieval is supported when a delivery has a stored artifact and can be downloaded from the delivery history table.
+- Scheduled reporting is wired through [`app/api/cron/reporting/route.ts`](./app/api/cron/reporting/route.ts) and [`vercel.json`](./vercel.json).
+- Public display mode is token-gated through `DISPLAY_ACCESS_TOKEN`; ops-authenticated display routes remain available for internal review.
 - Dashboard views are mobile-usable, desktop-optimized, and use restrained Motion only for entrance and tab transitions.
 - Future display-screen mode notes: [`features/reporting/display-mode-notes.md`](./features/reporting/display-mode-notes.md)
 
@@ -249,10 +271,9 @@ Conditional:
 
 ## Next recommended chunk
 
-Implement the next operational slice:
+Implement the next operational hardening slice:
 
-- release administration screens linked to downstream work-entry availability
-- scheduled snapshot/report generation wiring via Vercel Cron
-- target entry and template management ergonomics
-- extraction queue filtering and bulk review ergonomics
-- stronger document-family-specific preprocessing for Gemini inputs
+- target/template activity audit trails and soft-delete recovery if historical rollback is required
+- extraction queue bulk actions and document-family-specific preprocessing before Gemini submission
+- kiosk rotation playlists, screen heartbeat monitoring, and display-specific observability
+- release readiness notifications when stale baselines or failed extraction runs block work-entry

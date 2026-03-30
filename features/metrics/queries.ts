@@ -185,6 +185,46 @@ export async function loadMetricTargets(range: MetricWindowRange) {
   );
 }
 
+export async function getMetricTargetAdminList() {
+  const rows = await db
+    .select({
+      id: metricTargets.id,
+      windowType: metricTargets.windowType,
+      scopeType: metricTargets.scopeType,
+      scopeReferenceId: metricTargets.scopeReferenceId,
+      scopeKey: metricTargets.scopeKey,
+      metricKey: metricTargets.metricKey,
+      targetValue: metricTargets.targetValue,
+      unitLabel: metricTargets.unitLabel,
+      effectiveStart: metricTargets.effectiveStart,
+      effectiveEnd: metricTargets.effectiveEnd,
+      notes: metricTargets.notes,
+    })
+    .from(metricTargets)
+    .orderBy(
+      metricTargets.windowType,
+      metricTargets.scopeType,
+      metricTargets.scopeKey,
+      metricTargets.metricKey,
+    );
+
+  return rows.map(
+    (row): MetricTargetInput => ({
+      id: row.id,
+      windowType: row.windowType,
+      scopeType: row.scopeType,
+      scopeReferenceId: row.scopeReferenceId,
+      scopeKey: row.scopeKey,
+      metricKey: row.metricKey,
+      targetValue: toNumber(row.targetValue) ?? 0,
+      unitLabel: row.unitLabel,
+      effectiveStart: row.effectiveStart,
+      effectiveEnd: row.effectiveEnd,
+      notes: row.notes,
+    }),
+  );
+}
+
 export async function getLatestCompanySnapshot(
   windowType: MetricWindowRange["windowType"],
   windowStart: string,

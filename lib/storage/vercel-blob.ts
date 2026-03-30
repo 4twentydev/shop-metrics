@@ -3,12 +3,12 @@ import "server-only";
 import { head, put } from "@vercel/blob";
 
 import { env } from "@/lib/env";
-import type { FileStorage, StorePdfInput } from "@/lib/storage/types";
+import type { FileStorage, StoreFileInput, StorePdfInput } from "@/lib/storage/types";
 
 export class VercelBlobStorage implements FileStorage {
-  async storePdf(input: StorePdfInput) {
+  private async storeBuffer(input: StoreFileInput) {
     const blob = await put(
-      `job-releases/${input.releaseId}/${input.checksumSha256}-${input.fileName}`,
+      `${input.namespace}/${input.checksumSha256}-${input.fileName}`,
       input.buffer,
       {
         access: "private",
@@ -26,7 +26,31 @@ export class VercelBlobStorage implements FileStorage {
     };
   }
 
+  async storePdf(input: StorePdfInput) {
+    return this.storeBuffer({
+      ...input,
+      namespace: `job-releases/${input.releaseId}`,
+    });
+  }
+
   async readPdf(storageKey: string) {
+    const blob = await head(storageKey, {
+      token: env.BLOB_READ_WRITE_TOKEN,
+    });
+    const response = await fetch(blob.downloadUrl);
+
+    if (!response.ok) {
+      throw new Error(`Failed to read blob ${storageKey}.`);
+    }
+
+    return Buffer.from(await response.arrayBuffer());
+  }
+
+  async storeFile(input: StoreFileInput) {
+    return this.storeBuffer(input);
+  }
+
+  async readFile(storageKey: string) {
     const blob = await head(storageKey, {
       token: env.BLOB_READ_WRITE_TOKEN,
     });

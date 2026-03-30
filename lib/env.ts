@@ -20,6 +20,8 @@ const envSchema = z
     BLOB_READ_WRITE_TOKEN: z.string().min(1).optional(),
     GEMINI_API_KEY: z.string().min(1).optional(),
     GEMINI_MODEL: z.string().min(1).default("gemini-2.5-pro"),
+    CRON_SECRET: z.string().min(16).optional(),
+    DISPLAY_ACCESS_TOKEN: z.string().min(16).optional(),
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV === "production" && value.STORAGE_DRIVER === "local") {
@@ -76,6 +78,8 @@ export const env = envSchema.parse({
   BLOB_READ_WRITE_TOKEN: process.env.BLOB_READ_WRITE_TOKEN,
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   GEMINI_MODEL: process.env.GEMINI_MODEL,
+  CRON_SECRET: process.env.CRON_SECRET,
+  DISPLAY_ACCESS_TOKEN: process.env.DISPLAY_ACCESS_TOKEN,
 });
 
 export type Env = typeof env;
