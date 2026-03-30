@@ -235,7 +235,7 @@ export async function retryReleaseExtractionAction(formData: FormData) {
 
   await runExtraction({
     jobReleaseId: priorRun.jobReleaseId,
-    intakeBatchId: priorRun.intakeBatchId ?? undefined,
+    ...(priorRun.intakeBatchId !== null && { intakeBatchId: priorRun.intakeBatchId }),
     createdByUserId: session.user.id,
   });
 
@@ -364,7 +364,7 @@ export async function retryBulkExtractionAction(formData: FormData) {
 
     await runExtraction({
       jobReleaseId,
-      intakeBatchId: priorRun?.intakeBatchId ?? undefined,
+      ...(priorRun?.intakeBatchId != null && { intakeBatchId: priorRun.intakeBatchId }),
       createdByUserId: session.user.id,
     });
   }
