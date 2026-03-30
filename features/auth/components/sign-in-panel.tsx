@@ -21,7 +21,7 @@ export function SignInPanel() {
     const response = await authClient.signIn.passkey();
 
     if (response.error) {
-      setMessage(response.error.message ?? "Passkey sign-in failed.");
+      setMessage(typeof response.error.message === "string" ? response.error.message : "Passkey sign-in failed.");
       setIsPending(false);
       return;
     }
@@ -51,7 +51,7 @@ export function SignInPanel() {
     const response = await authClient.signIn.magicLink(parsed.data);
 
     if (response.error) {
-      setMessage(response.error.message ?? "Magic link sign-in failed.");
+      setMessage(typeof response.error.message === "string" ? response.error.message : "Magic link sign-in failed.");
       setIsPending(false);
       return;
     }
