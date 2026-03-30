@@ -1,3 +1,4 @@
+import type { Route } from "next";
 import Link from "next/link";
 
 import {
@@ -80,28 +81,30 @@ export function ExtractionReviewView({ data }: ExtractionReviewViewProps) {
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {[
-          {
-            label: "Ready",
-            value: data.queueSummary.READY,
-            href: "/ops/releases/extraction?queue=READY",
-          },
-          {
-            label: "Pending review",
-            value: data.queueSummary.PENDING_REVIEW,
-            href: "/ops/releases/extraction?queue=PENDING_REVIEW",
-          },
-          {
-            label: "Failed",
-            value: data.queueSummary.FAILED,
-            href: "/ops/releases/extraction?queue=FAILED",
-          },
-          {
-            label: "Stale baseline",
-            value: data.queueSummary.STALE_BASELINE,
-            href: "/ops/releases/extraction?queue=STALE_BASELINE",
-          },
-        ].map((card) => (
+        {(
+          [
+            {
+              label: "Ready",
+              value: data.queueSummary.READY,
+              href: "/ops/releases/extraction?queue=READY",
+            },
+            {
+              label: "Pending review",
+              value: data.queueSummary.PENDING_REVIEW,
+              href: "/ops/releases/extraction?queue=PENDING_REVIEW",
+            },
+            {
+              label: "Failed",
+              value: data.queueSummary.FAILED,
+              href: "/ops/releases/extraction?queue=FAILED",
+            },
+            {
+              label: "Stale baseline",
+              value: data.queueSummary.STALE_BASELINE,
+              href: "/ops/releases/extraction?queue=STALE_BASELINE",
+            },
+          ] satisfies Array<{ label: string; value: number; href: Route }>
+        ).map((card) => (
           <Link
             key={card.label}
             href={card.href}
@@ -119,9 +122,9 @@ export function ExtractionReviewView({ data }: ExtractionReviewViewProps) {
             <Link
               key={queue}
               href={
-                queue === "ALL"
+                (queue === "ALL"
                   ? "/ops/releases/extraction"
-                  : `/ops/releases/extraction?queue=${queue}`
+                  : `/ops/releases/extraction?queue=${queue}`) as Route
               }
               className={`rounded-full border px-4 py-2 text-sm font-semibold ${
                 data.activeQueue === queue
