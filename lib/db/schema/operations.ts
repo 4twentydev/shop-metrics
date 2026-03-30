@@ -53,6 +53,25 @@ export const extractionStatusEnum = pgEnum("extraction_status", [
   "REJECTED",
 ]);
 
+export const workEntryVerificationStatusEnum = pgEnum(
+  "work_entry_verification_status",
+  ["UNVERIFIED", "VERIFIED", "CHANGES_REQUESTED"],
+);
+
+export const shiftSubmissionStatusEnum = pgEnum("shift_submission_status", [
+  "OPEN",
+  "SUBMITTED",
+]);
+
+export const workEntryChangeTypeEnum = pgEnum("work_entry_change_type", [
+  "CREATED",
+  "EDITED",
+  "VERIFIED",
+  "COMMENTED",
+  "SUBMITTED",
+  "REOPENED",
+]);
+
 export const shifts = pgTable("shifts", {
   id: uuid("id").defaultRandom().primaryKey(),
   code: varchar("code", { length: 32 }).notNull().unique(),
@@ -300,4 +319,182 @@ export const jobDocuments = pgTable("job_documents", {
     mode: "date",
   }),
   isCurrent: boolean("is_current").notNull().default(true),
+});
+
+export const shiftSubmissions = pgTable(
+  "shift_submissions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    employeeId: uuid("employee_id")
+      .notNull()
+      .references(() => employees.id, { onDelete: "cascade" }),
+    stationId: uuid("station_id")
+      .notNull()
+      .references(() => stations.id, { onDelete: "restrict" }),
+    departmentId: uuid("department_id")
+      .notNull()
+      .references(() => departments.id, { onDelete: "restrict" }),
+    shiftId: uuid("shift_id")
+      .notNull()
+      .references(() => shifts.id, { onDelete: "restrict" }),
+    businessDate: date("business_date").notNull(),
+    status: shiftSubmissionStatusEnum("status").notNull().default("OPEN"),
+    submittedAt: timestamp("submitted_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    submittedByUserId: text("submitted_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    reopenedAt: timestamp("reopened_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    reopenedByUserId: text("reopened_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    reopenReason: text("reopen_reason"),
+    reopenCount: integer("reopen_count").notNull().default(0),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("shift_submissions_employee_shift_station_day_idx").on(
+      table.employeeId,
+      table.shiftId,
+      table.stationId,
+      table.businessDate,
+    ),
+  ],
+);
+
+export const workEntries = pgTable("work_entries", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  submissionId: uuid("submission_id")
+    .notNull()
+    .references(() => shiftSubmissions.id, { onDelete: "cascade" }),
+  jobReleaseId: uuid("job_release_id")
+    .notNull()
+    .references(() => jobReleases.id, { onDelete: "restrict" }),
+  stationId: uuid("station_id")
+    .notNull()
+    .references(() => stations.id, { onDelete: "restrict" }),
+  departmentId: uuid("department_id")
+    .notNull()
+    .references(() => departments.id, { onDelete: "restrict" }),
+  nativeUnitType: varchar("native_unit_type", { length: 48 }).notNull(),
+  nativeQuantity: numeric("native_quantity", {
+    precision: 12,
+    scale: 2,
+  }).notNull(),
+  panelEquivalentQuantity: numeric("panel_equivalent_quantity", {
+    precision: 12,
+    scale: 2,
+  }).notNull(),
+  businessDate: date("business_date").notNull(),
+  shiftId: uuid("shift_id")
+    .notNull()
+    .references(() => shifts.id, { onDelete: "restrict" }),
+  verificationStatus: workEntryVerificationStatusEnum("verification_status")
+    .notNull()
+    .default("UNVERIFIED"),
+  isLocked: boolean("is_locked").notNull().default(false),
+  versionCount: integer("version_count").notNull().default(1),
+  editedAt: timestamp("edited_at", {
+    withTimezone: true,
+    mode: "date",
+  }),
+  editedByUserId: text("edited_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  editReason: text("edit_reason"),
+  verifiedAt: timestamp("verified_at", {
+    withTimezone: true,
+    mode: "date",
+  }),
+  verifiedByUserId: text("verified_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  leadCommentCount: integer("lead_comment_count").notNull().default(0),
+  isRework: boolean("is_rework").notNull().default(false),
+  faultDepartmentId: uuid("fault_department_id").references(
+    () => departments.id,
+    { onDelete: "set null" },
+  ),
+  fixingDepartmentId: uuid("fixing_department_id").references(
+    () => departments.id,
+    { onDelete: "set null" },
+  ),
+  reworkNotes: text("rework_notes"),
+  createdByUserId: text("created_by_user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "restrict" }),
+  createdAt: timestamp("created_at", {
+    withTimezone: true,
+    mode: "date",
+  })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", {
+    withTimezone: true,
+    mode: "date",
+  })
+    .notNull()
+    .defaultNow(),
+});
+
+export const workEntryVersions = pgTable(
+  "work_entry_versions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workEntryId: uuid("work_entry_id")
+      .notNull()
+      .references(() => workEntries.id, { onDelete: "cascade" }),
+    versionNumber: integer("version_number").notNull(),
+    changeType: workEntryChangeTypeEnum("change_type").notNull(),
+    changedByUserId: text("changed_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    note: text("note"),
+    snapshot: jsonb("snapshot").notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("work_entry_versions_entry_version_idx").on(
+      table.workEntryId,
+      table.versionNumber,
+    ),
+  ],
+);
+
+export const workEntryComments = pgTable("work_entry_comments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  workEntryId: uuid("work_entry_id")
+    .notNull()
+    .references(() => workEntries.id, { onDelete: "cascade" }),
+  authorUserId: text("author_user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "restrict" }),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at", {
+    withTimezone: true,
+    mode: "date",
+  })
+    .notNull()
+    .defaultNow(),
 });

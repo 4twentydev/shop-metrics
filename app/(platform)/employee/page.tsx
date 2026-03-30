@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { requireSession } from "@/lib/auth/permissions";
 
@@ -25,9 +26,9 @@ export default async function EmployeePage() {
           Fast shift entry with normalized panel-equivalent reporting.
         </h2>
         <p className="mt-5 max-w-2xl text-base leading-7 text-muted">
-          This shell is prepared for release selection, native-unit entry,
-          append-only shift activity, and end-of-shift submit-all controls with
-          reopening captured in the audit trail.
+          The work-entry vertical slice is now available. Use the dedicated
+          route below to append production, edit entries with version history,
+          and hand off lead review cleanly.
         </p>
         <div className="mt-8 grid gap-4">
           {employeeCards.map((card) => (
@@ -39,6 +40,12 @@ export default async function EmployeePage() {
             </div>
           ))}
         </div>
+        <Link
+          href="/employee/work-entry"
+          className="mt-8 inline-flex rounded-full bg-accent px-5 py-3 text-sm font-semibold text-black"
+        >
+          Open employee work-entry route
+        </Link>
       </section>
 
       <section className="rounded-[1.75rem] border border-line/80 bg-panel-strong p-6">
@@ -48,10 +55,9 @@ export default async function EmployeePage() {
         <p className="mt-3 text-2xl font-semibold">{session.user.name}</p>
         <p className="mt-2 text-sm text-muted">{session.user.email}</p>
         <div className="mt-8 rounded-2xl border border-warning/25 bg-warning/8 p-4 text-sm text-muted">
-          Baseline-aware production entry, submit-all locking, and rework
-          capture are intentionally deferred to the next vertical slice so those
-          flows can be implemented with complete server actions and audit
-          coverage together.
+          Leads still own submit-all and reopen actions. Employees append and
+          revise work, but cross-department totals remain restricted to the lead
+          route.
         </div>
       </section>
     </main>

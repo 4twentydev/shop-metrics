@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { requireOpsRole } from "@/lib/auth/permissions";
 
@@ -25,9 +26,9 @@ export default async function OpsPage() {
           Verified releases, controlled baselines, and auditable shift closure.
         </h2>
         <p className="mt-5 max-w-2xl text-base leading-7 text-muted">
-          The ops surface is scaffolded for leadership and leads. It assumes
-          server-side data loading, centralized permissions, and controlled
-          status transitions for job releases and downstream shift submissions.
+          The work-entry vertical slice is now available for verification,
+          lead comments, cross-department rollups, submit-all locking, and
+          reopen audit coverage.
         </p>
         <div className="mt-8 grid gap-4">
           {opsCards.map((card) => (
@@ -39,6 +40,12 @@ export default async function OpsPage() {
             </div>
           ))}
         </div>
+        <Link
+          href="/ops/work-entry"
+          className="mt-8 inline-flex rounded-full bg-accent px-5 py-3 text-sm font-semibold text-black"
+        >
+          Open lead work-entry route
+        </Link>
       </section>
 
       <section className="space-y-4">
@@ -52,9 +59,9 @@ export default async function OpsPage() {
         <div className="rounded-[1.75rem] border border-line/80 bg-panel-strong p-6">
           <p className="font-semibold">Next operational modules</p>
           <ul className="mt-4 space-y-3 text-sm leading-6 text-muted">
-            <li>Shift work entry and lead verification workflow</li>
             <li>Job and release administration with baseline approvals</li>
             <li>Document ingestion and AI-assisted extraction review</li>
+            <li>Targets, reporting summaries, and export pipelines</li>
           </ul>
         </div>
       </section>

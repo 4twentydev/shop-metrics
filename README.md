@@ -17,6 +17,7 @@ Production foundation for a panel-centric manufacturing metrics platform built o
 - Audit log table and server-side audit helper
 - Feature-oriented folder structure
 - Admin/ops shell and employee shell
+- Employee and lead work-entry vertical slice
 
 ## Architecture notes
 
@@ -30,6 +31,12 @@ Production foundation for a panel-centric manufacturing metrics platform built o
 - Better Auth is configured without email/password accounts. Users are expected to be provisioned by admins, then sign in by passkey or magic link.
 - The initial schema is intentionally operationally focused: users, employees, roles, departments, stations, assignments, shifts, jobs, releases, documents, audit logs, plus the auth support tables Better Auth requires.
 - PDF upload handling is abstracted behind a storage interface so document ingestion can be implemented without binding page logic to a single storage provider.
+- Work-entry workflow is now centralized under `features/work-entries`, including:
+  - assignment-derived station and shift resolution
+  - submission locking and reopening
+  - explicit input schemas
+  - versioned entry history
+  - lead comments and verification
 
 ## Folder structure
 
@@ -45,6 +52,7 @@ features/
   metrics/
   releases/
   time/
+  work-entries/
 lib/
   audit/
   auth/
@@ -131,7 +139,23 @@ Conditional:
 
 - Drizzle schema: [`lib/db/schema`](./lib/db/schema)
 - SQL migration: [`drizzle/0000_foundation.sql`](./drizzle/0000_foundation.sql)
+- SQL migration: [`drizzle/0001_work_entry_vertical_slice.sql`](./drizzle/0001_work_entry_vertical_slice.sql)
 - Seed script: [`scripts/seed.ts`](./scripts/seed.ts)
+
+## Work-entry routes
+
+- Employee route: `/employee/work-entry`
+- Lead route: `/ops/work-entry`
+
+## Work-entry notes
+
+- Employees append entries to the same job release during a shift.
+- Station, department, shift, business date, native unit type, and panel normalization derive from the active assignment.
+- Leads verify in-flight work, leave comments, and see cross-department totals only on the lead route.
+- Submit-all locks the submission and all child entries.
+- Reopen requires a reason and is written to the audit log.
+- Entry edits are versioned and marked with editor and reason.
+- Future department extension notes: [`features/work-entries/extension-notes.md`](./features/work-entries/extension-notes.md)
 
 ## Auth notes
 
@@ -142,9 +166,9 @@ Conditional:
 
 ## Next recommended chunk
 
-Implement the first true operational vertical slice:
+Implement the next operational slice:
 
-- shift work-entry records
-- lead verification during the shift
-- submit-all locking and reopen audit logging
-- release-aware native-unit normalization into panel-equivalent output
+- baseline approval and stale-baseline handling after revised uploads
+- document upload actions using the storage abstraction
+- AI-assisted extraction review that never auto-approves source-of-truth fields
+- release administration screens linked to downstream work-entry availability

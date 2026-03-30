@@ -19,3 +19,7 @@ export const OPS_ROLES: RoleSlug[] = [
   ROLE_SLUGS.opsLead,
   ROLE_SLUGS.departmentLead,
 ];
+
+export function isOpsRole(role: string): role is RoleSlug {
+  return OPS_ROLES.includes(role as RoleSlug);
+}
