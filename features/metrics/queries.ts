@@ -1,7 +1,7 @@
 import "server-only";
 
 import {
-  alias,
+  aliasedTable,
   and,
   desc,
   eq,
@@ -33,8 +33,8 @@ import type {
   MetricSourceRow,
 } from "./types";
 
-const faultDepartments = alias(departments, "fault_departments");
-const fixingDepartments = alias(departments, "fixing_departments");
+const faultDepartments = aliasedTable(departments, "fault_departments");
+const fixingDepartments = aliasedTable(departments, "fixing_departments");
 
 function toNumber(value: string | number | null | undefined) {
   if (value === null || value === undefined) {
