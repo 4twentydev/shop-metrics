@@ -46,7 +46,6 @@ export const auth = betterAuth({
     magicLink({
       disableSignUp: true,
       expiresIn: 60 * 10,
-      storeToken: "hashed",
       sendMagicLink: async ({ email, url }) => {
         await sendMagicLinkEmail({ email, url });
       },
