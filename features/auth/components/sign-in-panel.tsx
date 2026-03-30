@@ -8,11 +8,23 @@ import { motion } from "motion/react";
 import { authClient } from "@/lib/auth/client";
 import { magicLinkSchema } from "@/lib/auth/schemas";
 
-export function SignInPanel() {
+function resolveMagicLinkError(error: string): string {
+  if (error === "token_expired" || error === "EXPIRED_TOKEN") {
+    return "That link has expired. Request a new one below.";
+  }
+  if (error === "invalid_token" || error === "INVALID_TOKEN") {
+    return "That link is invalid or was already used. Request a new one below.";
+  }
+  return "The sign-in link didn't work. Request a new one below.";
+}
+
+export function SignInPanel({ initialError }: { initialError?: string }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [isPending, setIsPending] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(
+    initialError ? resolveMagicLinkError(initialError) : null,
+  );
 
   async function handlePasskeySignIn() {
     setIsPending(true);
@@ -38,6 +50,7 @@ export function SignInPanel() {
     const parsed = magicLinkSchema.safeParse({
       email,
       callbackURL: "/employee",
+      errorCallbackURL: "/sign-in",
     });
 
     if (!parsed.success) {
