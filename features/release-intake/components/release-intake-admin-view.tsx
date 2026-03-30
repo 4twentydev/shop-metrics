@@ -2,6 +2,7 @@ import { addReleaseCommentAction, reviewDocumentDecisionAction } from "@/feature
 import { parseReleaseCode } from "@/features/release-intake/logic";
 import type { ReleaseIntakePageData } from "@/features/release-intake/queries";
 import { UploadBatchForm } from "@/features/release-intake/components/upload-batch-form";
+import Link from "next/link";
 
 type ReleaseIntakeAdminViewProps = {
   data: ReleaseIntakePageData;
@@ -12,6 +13,14 @@ export function ReleaseIntakeAdminView({
 }: ReleaseIntakeAdminViewProps) {
   return (
     <main className="space-y-6 p-6">
+      <div className="flex justify-end">
+        <Link
+          href="/ops/releases/extraction"
+          className="rounded-full border border-line px-4 py-2 text-sm font-semibold"
+        >
+          Open extraction review
+        </Link>
+      </div>
       <UploadBatchForm
         releases={data.releases.map((release) => ({
           releaseId: release.releaseId,

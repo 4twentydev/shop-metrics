@@ -1,6 +1,6 @@
 import "server-only";
 
-import { put } from "@vercel/blob";
+import { head, put } from "@vercel/blob";
 
 import { env } from "@/lib/env";
 import type { FileStorage, StorePdfInput } from "@/lib/storage/types";
@@ -24,5 +24,18 @@ export class VercelBlobStorage implements FileStorage {
       storageUrl: null,
       byteSize: input.buffer.byteLength,
     };
+  }
+
+  async readPdf(storageKey: string) {
+    const blob = await head(storageKey, {
+      token: env.BLOB_READ_WRITE_TOKEN,
+    });
+    const response = await fetch(blob.downloadUrl);
+
+    if (!response.ok) {
+      throw new Error(`Failed to read blob ${storageKey}.`);
+    }
+
+    return Buffer.from(await response.arrayBuffer());
   }
 }

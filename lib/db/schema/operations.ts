@@ -64,6 +64,19 @@ export const supersedeDecisionEnum = pgEnum("supersede_decision", [
   "KEEP_REFERENCE",
 ]);
 
+export const extractionRunStatusEnum = pgEnum("extraction_run_status", [
+  "QUEUED",
+  "PROCESSING",
+  "SUCCEEDED",
+  "FAILED",
+]);
+
+export const extractionReviewStatusEnum = pgEnum("extraction_review_status", [
+  "PENDING_REVIEW",
+  "APPROVED",
+  "REJECTED",
+]);
+
 export const workEntryVerificationStatusEnum = pgEnum(
   "work_entry_verification_status",
   ["UNVERIFIED", "VERIFIED", "CHANGES_REQUESTED"],
@@ -276,6 +289,7 @@ export const jobReleases = pgTable(
     }),
     baselineStaleReason: text("baseline_stale_reason"),
     baselineStaleSourceBatchId: uuid("baseline_stale_source_batch_id"),
+    baselineApprovedExtractionRunId: uuid("baseline_approved_extraction_run_id"),
     plannedShipDate: date("planned_ship_date"),
     dueDate: date("due_date"),
     notes: text("notes"),
@@ -398,6 +412,63 @@ export const releaseComments = pgTable("release_comments", {
     .notNull()
     .references(() => users.id, { onDelete: "restrict" }),
   body: text("body").notNull(),
+  createdAt: timestamp("created_at", {
+    withTimezone: true,
+    mode: "date",
+  })
+    .notNull()
+    .defaultNow(),
+});
+
+export const releaseExtractionRuns = pgTable("release_extraction_runs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  jobReleaseId: uuid("job_release_id")
+    .notNull()
+    .references(() => jobReleases.id, { onDelete: "cascade" }),
+  intakeBatchId: uuid("intake_batch_id").references(() => releaseIntakeBatches.id, {
+    onDelete: "set null",
+  }),
+  provider: varchar("provider", { length: 32 }).notNull(),
+  model: varchar("model", { length: 80 }).notNull(),
+  status: extractionRunStatusEnum("status").notNull().default("QUEUED"),
+  reviewStatus: extractionReviewStatusEnum("review_status")
+    .notNull()
+    .default("PENDING_REVIEW"),
+  attemptNumber: integer("attempt_number").notNull().default(1),
+  sourceDocumentIds: jsonb("source_document_ids").notNull(),
+  rawOutput: jsonb("raw_output"),
+  normalizedOutput: jsonb("normalized_output"),
+  reviewedOutput: jsonb("reviewed_output"),
+  confidence: numeric("confidence", {
+    precision: 5,
+    scale: 4,
+  }),
+  errorMessage: text("error_message"),
+  reviewerNotes: text("reviewer_notes"),
+  createdByUserId: text("created_by_user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "restrict" }),
+  reviewedByUserId: text("reviewed_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  startedAt: timestamp("started_at", {
+    withTimezone: true,
+    mode: "date",
+  })
+    .notNull()
+    .defaultNow(),
+  completedAt: timestamp("completed_at", {
+    withTimezone: true,
+    mode: "date",
+  }),
+  reviewedAt: timestamp("reviewed_at", {
+    withTimezone: true,
+    mode: "date",
+  }),
+  approvedAt: timestamp("approved_at", {
+    withTimezone: true,
+    mode: "date",
+  }),
   createdAt: timestamp("created_at", {
     withTimezone: true,
     mode: "date",

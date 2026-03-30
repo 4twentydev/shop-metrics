@@ -19,6 +19,7 @@ Production foundation for a panel-centric manufacturing metrics platform built o
 - Admin/ops shell and employee shell
 - Employee and lead work-entry vertical slice
 - Release intake and document revision vertical slice
+- Gemini extraction review vertical slice
 
 ## Architecture notes
 
@@ -131,9 +132,11 @@ Conditional:
    - `BETTER_AUTH_RP_ID`
    - `BETTER_AUTH_TRUSTED_ORIGIN`
    - `AUTH_FROM_EMAIL`
-   - `RESEND_API_KEY`
-   - `STORAGE_DRIVER=vercel-blob`
-   - `BLOB_READ_WRITE_TOKEN`
+  - `RESEND_API_KEY`
+  - `STORAGE_DRIVER=vercel-blob`
+  - `BLOB_READ_WRITE_TOKEN`
+  - `GEMINI_API_KEY`
+  - `GEMINI_MODEL`
 5. Run `npm run db:migrate` against the production database before first use.
 6. Redeploy after the environment variables are saved.
 
@@ -154,6 +157,10 @@ Conditional:
 
 - Admin / lead route: `/ops/releases/intake`
 
+## Extraction review route
+
+- Admin / lead route: `/ops/releases/extraction`
+
 ## Release intake notes
 
 - Jobs support 5-digit numbers in validation and seeded data.
@@ -164,6 +171,15 @@ Conditional:
 - Baselines are flagged stale when approved releases receive baseline-affecting revised uploads.
 - Review comments are stored at the release level and optionally tied to an intake batch.
 - Intake batches move to `HANDOFF_READY` once pending supersede decisions are resolved, which creates a clean extraction handoff point.
+
+## Gemini extraction notes
+
+- Gemini is wrapped behind a server-side abstraction in [`lib/ai/gemini.ts`](./lib/ai/gemini.ts).
+- Extraction runs persist raw model output, normalized structured output, edited reviewed output, confidence, run status, and review status.
+- Extraction combines the release's current document set into one release-level summary.
+- AI output is never auto-approved. Reviewers edit fields first, then explicitly approve the baseline.
+- Revised uploads can keep a release in stale-baseline review until a reviewed extraction run is approved.
+- Document-type extension notes: [`features/extraction/extractor-extension-notes.md`](./features/extraction/extractor-extension-notes.md)
 
 ## Work-entry notes
 
@@ -186,7 +202,7 @@ Conditional:
 
 Implement the next operational slice:
 
-- AI-assisted extraction review that never auto-approves source-of-truth fields
-- baseline approval actions tied to reviewed release documents
 - release administration screens linked to downstream work-entry availability
-- extraction queue UI and reviewer workflow on top of the intake handoff state
+- reporting summaries and export pipelines based on approved baselines and verified work entry
+- extraction queue filtering and bulk review ergonomics
+- stronger document-family-specific preprocessing for Gemini inputs

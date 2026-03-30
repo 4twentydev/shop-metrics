@@ -15,4 +15,5 @@ export type StorePdfInput = {
 
 export interface FileStorage {
   storePdf(input: StorePdfInput): Promise<StoredPdf>;
+  readPdf(storageKey: string): Promise<Buffer>;
 }

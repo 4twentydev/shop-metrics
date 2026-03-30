@@ -1,6 +1,6 @@
 import "server-only";
 
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { env } from "@/lib/env";
@@ -26,5 +26,10 @@ export class LocalFileStorage implements FileStorage {
       storageUrl: null,
       byteSize: input.buffer.byteLength,
     };
+  }
+
+  async readPdf(storageKey: string) {
+    const absolutePath = path.join(env.LOCAL_FILE_STORAGE_ROOT, storageKey);
+    return readFile(absolutePath);
   }
 }

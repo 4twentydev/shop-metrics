@@ -52,6 +52,12 @@ export default async function OpsPage() {
         >
           Open release intake review
         </Link>
+        <Link
+          href="/ops/releases/extraction"
+          className="mt-3 inline-flex rounded-full border border-line px-5 py-3 text-sm font-semibold"
+        >
+          Open extraction review
+        </Link>
       </section>
 
       <section className="space-y-4">

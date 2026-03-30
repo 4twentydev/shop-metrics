@@ -10,6 +10,7 @@ import {
   jobReleases,
   jobs,
   releaseComments,
+  releaseExtractionRuns,
   releaseIntakeBatches,
   roles,
   shiftSubmissions,
@@ -396,8 +397,11 @@ async function main() {
   const intakeDemoRelease = await db.query.jobReleases.findFirst({
     where: eq(jobReleases.releaseCode, "RMK1"),
   });
+  const engineeringRelease = await db.query.jobReleases.findFirst({
+    where: eq(jobReleases.releaseCode, "RME1"),
+  });
 
-  if (!seededRelease || !intakeDemoRelease) {
+  if (!seededRelease || !intakeDemoRelease || !engineeringRelease) {
     throw new Error("Seed releases were not created.");
   }
 
@@ -547,6 +551,211 @@ async function main() {
       },
     ])
     .onConflictDoNothing();
+
+  const baselineDoc = await db.query.jobDocuments.findFirst({
+    where: and(
+      eq(jobDocuments.jobReleaseId, seededRelease.id),
+      eq(jobDocuments.documentFamily, "BASELINE_PACKET"),
+    ),
+  });
+  const demoDocs = await db.query.jobDocuments.findMany({
+    where: eq(jobDocuments.jobReleaseId, intakeDemoRelease.id),
+  });
+
+  if (!baselineDoc || demoDocs.length === 0) {
+    throw new Error("Seed extraction documents were not created.");
+  }
+
+  const approvedRun = await db
+    .insert(releaseExtractionRuns)
+    .values({
+      jobReleaseId: seededRelease.id,
+      provider: "gemini",
+      model: "gemini-2.5-pro",
+      status: "SUCCEEDED",
+      reviewStatus: "APPROVED",
+      attemptNumber: 1,
+      sourceDocumentIds: [baselineDoc.id],
+      rawOutput: {
+        candidates: 1,
+      },
+      normalizedOutput: {
+        releaseCode: "R1",
+        revisionCode: "A",
+        customerName: "North Ridge Utilities",
+        productName: "Outdoor Disconnect Panels",
+        summary: {
+          expectedPanels: 640,
+          releaseTotals:
+            "Release total confirms 640 panels in the baseline packet.",
+          materialTotals:
+            "Steel enclosure material and bus components match baseline pack.",
+          partTotals: "Primary part totals align with 640-panel build.",
+          accessoryTotals:
+            "Accessory pack includes standard hardware and labels.",
+          dueDates: ["2026-04-01"],
+          revisionNotes: ["Baseline packet approved without open revisions."],
+          additionalSummaryFields: [
+            {
+              label: "Primary enclosure type",
+              value: "Outdoor disconnect enclosure",
+            },
+          ],
+          confidence: 0.96,
+        },
+      },
+      reviewedOutput: {
+        releaseCode: "R1",
+        revisionCode: "A",
+        customerName: "North Ridge Utilities",
+        productName: "Outdoor Disconnect Panels",
+        summary: {
+          expectedPanels: 640,
+          releaseTotals:
+            "Release total confirms 640 panels in the baseline packet.",
+          materialTotals:
+            "Steel enclosure material and bus components match baseline pack.",
+          partTotals: "Primary part totals align with 640-panel build.",
+          accessoryTotals:
+            "Accessory pack includes standard hardware and labels.",
+          dueDates: ["2026-04-01"],
+          revisionNotes: ["Baseline packet approved without open revisions."],
+          additionalSummaryFields: [
+            {
+              label: "Primary enclosure type",
+              value: "Outdoor disconnect enclosure",
+            },
+          ],
+          confidence: 0.96,
+        },
+      },
+      confidence: "0.9600",
+      reviewerNotes: "Reviewed and approved as release baseline.",
+      createdByUserId: "usr_ops_lead",
+      reviewedByUserId: "usr_ops_lead",
+      completedAt: now,
+      reviewedAt: now,
+      approvedAt: now,
+    })
+    .onConflictDoNothing()
+    .returning({ id: releaseExtractionRuns.id });
+
+  await db
+    .insert(releaseExtractionRuns)
+    .values({
+      jobReleaseId: intakeDemoRelease.id,
+      intakeBatchId,
+      provider: "gemini",
+      model: "gemini-2.5-pro",
+      status: "SUCCEEDED",
+      reviewStatus: "PENDING_REVIEW",
+      attemptNumber: 1,
+      sourceDocumentIds: demoDocs.map((doc) => doc.id),
+      rawOutput: {
+        candidates: 1,
+      },
+      normalizedOutput: {
+        releaseCode: "RMK1",
+        revisionCode: "B",
+        customerName: "Cedar Valley Power",
+        productName: "Metering Retrofit Panels",
+        summary: {
+          expectedPanels: 188,
+          releaseTotals:
+            "Revised release totals indicate 188 panel-equivalent units.",
+          materialTotals:
+            "Copper bar, metering cans, and steel backpan counts revised upward.",
+          partTotals:
+            "Primary mechanical parts updated for revised meter arrangement.",
+          accessoryTotals:
+            "Accessory total includes labels, terminals, and gasket kits.",
+          dueDates: ["2026-04-08", "2026-04-10"],
+          revisionNotes: [
+            "Revision packet supersede still pending review.",
+            "Quality cert attached.",
+          ],
+          additionalSummaryFields: [
+            {
+              label: "Meter can configuration",
+              value: "Revised to dual grouping arrangement",
+            },
+          ],
+          confidence: 0.82,
+        },
+      },
+      reviewedOutput: {
+        releaseCode: "RMK1",
+        revisionCode: "B",
+        customerName: "Cedar Valley Power",
+        productName: "Metering Retrofit Panels",
+        summary: {
+          expectedPanels: 188,
+          releaseTotals:
+            "Revised release totals indicate 188 panel-equivalent units.",
+          materialTotals:
+            "Copper bar, metering cans, and steel backpan counts revised upward.",
+          partTotals:
+            "Primary mechanical parts updated for revised meter arrangement.",
+          accessoryTotals:
+            "Accessory total includes labels, terminals, and gasket kits.",
+          dueDates: ["2026-04-08", "2026-04-10"],
+          revisionNotes: [
+            "Revision packet supersede still pending review.",
+            "Quality cert attached.",
+          ],
+          additionalSummaryFields: [
+            {
+              label: "Meter can configuration",
+              value: "Revised to dual grouping arrangement",
+            },
+          ],
+          confidence: 0.82,
+        },
+      },
+      confidence: "0.8200",
+      reviewerNotes: "Requires human adjustment before baseline re-approval.",
+      createdByUserId: "usr_ops_lead",
+      completedAt: now,
+      reviewedAt: now,
+    })
+    .onConflictDoNothing();
+
+  await db
+    .insert(releaseExtractionRuns)
+    .values({
+      jobReleaseId: engineeringRelease.id,
+      provider: "gemini",
+      model: "gemini-2.5-pro",
+      status: "FAILED",
+      reviewStatus: "PENDING_REVIEW",
+      attemptNumber: 1,
+      sourceDocumentIds: [],
+      errorMessage:
+        "Gemini could not extract a stable summary because the release document set is incomplete.",
+      createdByUserId: "usr_ops_lead",
+      completedAt: now,
+    })
+    .onConflictDoNothing();
+
+  const approvedRunId =
+    approvedRun[0]?.id ??
+    (
+      await db.query.releaseExtractionRuns.findFirst({
+        where: eq(releaseExtractionRuns.jobReleaseId, seededRelease.id),
+      })
+    )?.id;
+
+  if (!approvedRunId) {
+    throw new Error("Approved extraction run was not created.");
+  }
+
+  await db
+    .update(jobReleases)
+    .set({
+      baselineApprovedExtractionRunId: approvedRunId,
+      updatedAt: now,
+    })
+    .where(eq(jobReleases.id, seededRelease.id));
 
   await db
     .insert(shiftSubmissions)
@@ -758,7 +967,7 @@ async function main() {
     metadata: {
       users: seededUsers.length,
       departments: 6,
-      version: 3,
+      version: 4,
     },
   });
 

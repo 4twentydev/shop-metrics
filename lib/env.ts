@@ -18,6 +18,8 @@ const envSchema = z
     STORAGE_DRIVER: z.enum(["local", "vercel-blob"]).default("local"),
     LOCAL_FILE_STORAGE_ROOT: z.string().min(1).default(".data/uploads"),
     BLOB_READ_WRITE_TOKEN: z.string().min(1).optional(),
+    GEMINI_API_KEY: z.string().min(1).optional(),
+    GEMINI_MODEL: z.string().min(1).default("gemini-2.5-pro"),
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV === "production" && value.STORAGE_DRIVER === "local") {
@@ -49,6 +51,14 @@ const envSchema = z
         path: ["RESEND_API_KEY"],
       });
     }
+
+    if (value.NODE_ENV === "production" && !value.GEMINI_API_KEY) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "GEMINI_API_KEY is required in production for extraction.",
+        path: ["GEMINI_API_KEY"],
+      });
+    }
   });
 
 export const env = envSchema.parse({
@@ -64,6 +74,8 @@ export const env = envSchema.parse({
   STORAGE_DRIVER: process.env.STORAGE_DRIVER,
   LOCAL_FILE_STORAGE_ROOT: process.env.LOCAL_FILE_STORAGE_ROOT,
   BLOB_READ_WRITE_TOKEN: process.env.BLOB_READ_WRITE_TOKEN,
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+  GEMINI_MODEL: process.env.GEMINI_MODEL,
 });
 
 export type Env = typeof env;
