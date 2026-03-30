@@ -46,6 +46,12 @@ export default async function OpsPage() {
         >
           Open lead work-entry route
         </Link>
+        <Link
+          href="/ops/releases/intake"
+          className="mt-3 inline-flex rounded-full border border-line px-5 py-3 text-sm font-semibold"
+        >
+          Open release intake review
+        </Link>
       </section>
 
       <section className="space-y-4">

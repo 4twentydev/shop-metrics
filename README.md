@@ -18,6 +18,7 @@ Production foundation for a panel-centric manufacturing metrics platform built o
 - Feature-oriented folder structure
 - Admin/ops shell and employee shell
 - Employee and lead work-entry vertical slice
+- Release intake and document revision vertical slice
 
 ## Architecture notes
 
@@ -51,6 +52,7 @@ features/
   extraction/
   metrics/
   releases/
+  release-intake/
   time/
   work-entries/
 lib/
@@ -140,12 +142,28 @@ Conditional:
 - Drizzle schema: [`lib/db/schema`](./lib/db/schema)
 - SQL migration: [`drizzle/0000_foundation.sql`](./drizzle/0000_foundation.sql)
 - SQL migration: [`drizzle/0001_work_entry_vertical_slice.sql`](./drizzle/0001_work_entry_vertical_slice.sql)
+- SQL migration: [`drizzle/0002_release_intake_documents.sql`](./drizzle/0002_release_intake_documents.sql)
 - Seed script: [`scripts/seed.ts`](./scripts/seed.ts)
 
 ## Work-entry routes
 
 - Employee route: `/employee/work-entry`
 - Lead route: `/ops/work-entry`
+
+## Release intake route
+
+- Admin / lead route: `/ops/releases/intake`
+
+## Release intake notes
+
+- Jobs support 5-digit numbers in validation and seeded data.
+- Release codes support `R#`, `RMK#`, `RME#`, and `A#`.
+- Multiple related PDFs can be uploaded in one intake batch.
+- Documents stay grouped under the release and preserve revision history by `documentFamily` plus `revisionNumber`.
+- Supersede decisions are manual and review-driven.
+- Baselines are flagged stale when approved releases receive baseline-affecting revised uploads.
+- Review comments are stored at the release level and optionally tied to an intake batch.
+- Intake batches move to `HANDOFF_READY` once pending supersede decisions are resolved, which creates a clean extraction handoff point.
 
 ## Work-entry notes
 
@@ -168,7 +186,7 @@ Conditional:
 
 Implement the next operational slice:
 
-- baseline approval and stale-baseline handling after revised uploads
-- document upload actions using the storage abstraction
 - AI-assisted extraction review that never auto-approves source-of-truth fields
+- baseline approval actions tied to reviewed release documents
 - release administration screens linked to downstream work-entry availability
+- extraction queue UI and reviewer workflow on top of the intake handoff state

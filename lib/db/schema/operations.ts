@@ -53,6 +53,17 @@ export const extractionStatusEnum = pgEnum("extraction_status", [
   "REJECTED",
 ]);
 
+export const releaseIntakeBatchStatusEnum = pgEnum(
+  "release_intake_batch_status",
+  ["PENDING_REVIEW", "HANDOFF_READY"],
+);
+
+export const supersedeDecisionEnum = pgEnum("supersede_decision", [
+  "PENDING",
+  "SUPERSEDE",
+  "KEEP_REFERENCE",
+]);
+
 export const workEntryVerificationStatusEnum = pgEnum(
   "work_entry_verification_status",
   ["UNVERIFIED", "VERIFIED", "CHANGES_REQUESTED"],
@@ -264,6 +275,7 @@ export const jobReleases = pgTable(
       mode: "date",
     }),
     baselineStaleReason: text("baseline_stale_reason"),
+    baselineStaleSourceBatchId: uuid("baseline_stale_source_batch_id"),
     plannedShipDate: date("planned_ship_date"),
     dueDate: date("due_date"),
     notes: text("notes"),
@@ -293,7 +305,14 @@ export const jobDocuments = pgTable("job_documents", {
   jobReleaseId: uuid("job_release_id")
     .notNull()
     .references(() => jobReleases.id, { onDelete: "cascade" }),
+  intakeBatchId: uuid("intake_batch_id"),
   kind: documentKindEnum("kind").notNull(),
+  documentFamily: varchar("document_family", { length: 64 }).notNull(),
+  revisionNumber: integer("revision_number").notNull().default(1),
+  supersedeDecision: supersedeDecisionEnum("supersede_decision")
+    .notNull()
+    .default("PENDING"),
+  supersedesDocumentId: uuid("supersedes_document_id"),
   fileName: varchar("file_name", { length: 255 }).notNull(),
   contentType: varchar("content_type", { length: 128 }).notNull(),
   byteSize: integer("byte_size").notNull(),
@@ -310,6 +329,15 @@ export const jobDocuments = pgTable("job_documents", {
   })
     .notNull()
     .defaultNow(),
+  reviewedAt: timestamp("reviewed_at", {
+    withTimezone: true,
+    mode: "date",
+  }),
+  reviewedByUserId: text("reviewed_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  affectsBaseline: boolean("affects_baseline").notNull().default(false),
+  uploaderNotes: text("uploader_notes"),
   extractionStatus: extractionStatusEnum("extraction_status")
     .notNull()
     .default("PENDING"),
@@ -318,7 +346,64 @@ export const jobDocuments = pgTable("job_documents", {
     withTimezone: true,
     mode: "date",
   }),
+  extractionHandoffAt: timestamp("extraction_handoff_at", {
+    withTimezone: true,
+    mode: "date",
+  }),
   isCurrent: boolean("is_current").notNull().default(true),
+});
+
+export const releaseIntakeBatches = pgTable("release_intake_batches", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  jobReleaseId: uuid("job_release_id")
+    .notNull()
+    .references(() => jobReleases.id, { onDelete: "cascade" }),
+  uploadLabel: varchar("upload_label", { length: 120 }).notNull(),
+  notes: text("notes"),
+  status: releaseIntakeBatchStatusEnum("status")
+    .notNull()
+    .default("PENDING_REVIEW"),
+  affectsApprovedBaseline: boolean("affects_approved_baseline")
+    .notNull()
+    .default(false),
+  extractionHandoffAt: timestamp("extraction_handoff_at", {
+    withTimezone: true,
+    mode: "date",
+  }),
+  uploadedByUserId: text("uploaded_by_user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "restrict" }),
+  reviewedByUserId: text("reviewed_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  reviewedAt: timestamp("reviewed_at", {
+    withTimezone: true,
+    mode: "date",
+  }),
+  createdAt: timestamp("created_at", {
+    withTimezone: true,
+    mode: "date",
+  })
+    .notNull()
+    .defaultNow(),
+});
+
+export const releaseComments = pgTable("release_comments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  jobReleaseId: uuid("job_release_id")
+    .notNull()
+    .references(() => jobReleases.id, { onDelete: "cascade" }),
+  intakeBatchId: uuid("intake_batch_id"),
+  authorUserId: text("author_user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "restrict" }),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at", {
+    withTimezone: true,
+    mode: "date",
+  })
+    .notNull()
+    .defaultNow(),
 });
 
 export const shiftSubmissions = pgTable(

@@ -15,6 +15,13 @@
       "when": 1774846800000,
       "tag": "0001_work_entry_vertical_slice",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774850400000,
+      "tag": "0002_release_intake_documents",
+      "breakpoints": true
     }
   ]
 }

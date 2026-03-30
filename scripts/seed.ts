@@ -9,6 +9,8 @@ import {
   jobDocuments,
   jobReleases,
   jobs,
+  releaseComments,
+  releaseIntakeBatches,
   roles,
   shiftSubmissions,
   shifts,
@@ -301,53 +303,113 @@ async function main() {
 
   await db
     .insert(jobs)
-    .values({
-      jobNumber: "J-240315",
-      customerName: "North Ridge Utilities",
-      productName: "Outdoor Disconnect Panels",
-      status: "ACTIVE",
-      createdByUserId: "usr_admin_elward",
-    })
+    .values([
+      {
+        jobNumber: "24031",
+        customerName: "North Ridge Utilities",
+        productName: "Outdoor Disconnect Panels",
+        status: "ACTIVE",
+        createdByUserId: "usr_admin_elward",
+      },
+      {
+        jobNumber: "24032",
+        customerName: "Cedar Valley Power",
+        productName: "Metering Retrofit Panels",
+        status: "ACTIVE",
+        createdByUserId: "usr_admin_elward",
+      },
+      {
+        jobNumber: "24033",
+        customerName: "Mesa Water",
+        productName: "Accessory Enclosures",
+        status: "PLANNED",
+        createdByUserId: "usr_admin_elward",
+      },
+    ])
     .onConflictDoNothing();
 
   const seededJob = await db.query.jobs.findFirst({
-    where: eq(jobs.jobNumber, "J-240315"),
+    where: eq(jobs.jobNumber, "24031"),
+  });
+  const secondaryJob = await db.query.jobs.findFirst({
+    where: eq(jobs.jobNumber, "24032"),
+  });
+  const tertiaryJob = await db.query.jobs.findFirst({
+    where: eq(jobs.jobNumber, "24033"),
   });
 
-  if (!seededJob) {
-    throw new Error("Seed job was not created.");
+  if (!seededJob || !secondaryJob || !tertiaryJob) {
+    throw new Error("Seed jobs were not created.");
   }
 
   await db
     .insert(jobReleases)
-    .values({
-      jobId: seededJob.id,
-      releaseCode: "R1",
-      revisionCode: "A",
-      status: "READY",
-      panelBaseline: "640.00",
-      baselineApprovedAt: now,
-      baselineApprovedByUserId: "usr_ops_lead",
-      plannedShipDate: "2026-04-03",
-      dueDate: "2026-04-01",
-      notes: "Initial seeded release for platform foundation.",
-    })
+    .values([
+      {
+        jobId: seededJob.id,
+        releaseCode: "R1",
+        revisionCode: "A",
+        status: "READY",
+        panelBaseline: "640.00",
+        baselineApprovedAt: now,
+        baselineApprovedByUserId: "usr_ops_lead",
+        plannedShipDate: "2026-04-03",
+        dueDate: "2026-04-01",
+        notes: "Initial seeded release for platform foundation.",
+      },
+      {
+        jobId: secondaryJob.id,
+        releaseCode: "RMK1",
+        revisionCode: "B",
+        status: "READY",
+        panelBaseline: "180.00",
+        baselineApprovedAt: now,
+        baselineApprovedByUserId: "usr_ops_lead",
+        plannedShipDate: "2026-04-10",
+        dueDate: "2026-04-08",
+        notes: "Remark release for intake review demo.",
+      },
+      {
+        jobId: secondaryJob.id,
+        releaseCode: "RME1",
+        revisionCode: "A",
+        status: "PENDING_BASELINE",
+        plannedShipDate: "2026-04-12",
+        dueDate: "2026-04-10",
+        notes: "Engineering revision release awaiting baseline.",
+      },
+      {
+        jobId: tertiaryJob.id,
+        releaseCode: "A1",
+        revisionCode: "A",
+        status: "PENDING_BASELINE",
+        plannedShipDate: "2026-04-20",
+        dueDate: "2026-04-18",
+        notes: "Accessory release type demo.",
+      },
+    ])
     .onConflictDoNothing();
 
   const seededRelease = await db.query.jobReleases.findFirst({
     where: eq(jobReleases.releaseCode, "R1"),
   });
+  const intakeDemoRelease = await db.query.jobReleases.findFirst({
+    where: eq(jobReleases.releaseCode, "RMK1"),
+  });
 
-  if (!seededRelease) {
-    throw new Error("Seed release was not created.");
+  if (!seededRelease || !intakeDemoRelease) {
+    throw new Error("Seed releases were not created.");
   }
 
   await db
     .insert(jobDocuments)
     .values({
       jobReleaseId: seededRelease.id,
+      documentFamily: "BASELINE_PACKET",
       kind: "BASELINE_PDF",
-      fileName: "J-240315-R1-baseline.pdf",
+      revisionNumber: 1,
+      supersedeDecision: "KEEP_REFERENCE",
+      fileName: "24031-R1-baseline.pdf",
       contentType: "application/pdf",
       byteSize: 204800,
       checksumSha256:
@@ -363,7 +425,127 @@ async function main() {
         confidence: 0.87,
       },
       uploadedByUserId: "usr_ops_lead",
+      affectsBaseline: true,
+      uploaderNotes: "Approved baseline packet.",
     })
+    .onConflictDoNothing();
+
+  const intakeBatch = await db
+    .insert(releaseIntakeBatches)
+    .values({
+      jobReleaseId: intakeDemoRelease.id,
+      uploadLabel: "RMK1 revised packet",
+      notes: "Customer revision package uploaded for review.",
+      status: "PENDING_REVIEW",
+      affectsApprovedBaseline: true,
+      uploadedByUserId: "usr_ops_lead",
+    })
+    .onConflictDoNothing()
+    .returning({ id: releaseIntakeBatches.id });
+
+  const intakeBatchId =
+    intakeBatch[0]?.id ??
+    (
+      await db.query.releaseIntakeBatches.findFirst({
+        where: eq(releaseIntakeBatches.jobReleaseId, intakeDemoRelease.id),
+      })
+    )?.id;
+
+  if (!intakeBatchId) {
+    throw new Error("Seed intake batch was not created.");
+  }
+
+  await db
+    .update(jobReleases)
+    .set({
+      baselineStaleAt: now,
+      baselineStaleReason:
+        "A revised intake batch uploaded baseline-affecting documents after approval.",
+      baselineStaleSourceBatchId: intakeBatchId,
+      updatedAt: now,
+    })
+    .where(eq(jobReleases.id, intakeDemoRelease.id));
+
+  await db
+    .insert(jobDocuments)
+    .values([
+      {
+        jobReleaseId: intakeDemoRelease.id,
+        documentFamily: "REVISION_PACKET",
+        kind: "REVISION_PDF",
+        revisionNumber: 1,
+        supersedeDecision: "KEEP_REFERENCE",
+        fileName: "24032-RMK1-revision-packet-v1.pdf",
+        contentType: "application/pdf",
+        byteSize: 190000,
+        checksumSha256:
+          "ab46d6b8d73f4cf142b71f22bcaa4fbfef4d4f1bdd1bcd0ab6f79edcc8dcf121",
+        storageProvider: "local",
+        storageKey: "seed/24032-RMK1-revision-packet-v1.pdf",
+        extractionStatus: "PENDING",
+        uploadedByUserId: "usr_ops_lead",
+        affectsBaseline: true,
+        uploaderNotes: "Original current revision packet.",
+        isCurrent: true,
+      },
+      {
+        jobReleaseId: intakeDemoRelease.id,
+        intakeBatchId,
+        documentFamily: "REVISION_PACKET",
+        kind: "REVISION_PDF",
+        revisionNumber: 2,
+        supersedeDecision: "PENDING",
+        fileName: "24032-RMK1-revision-packet-v2.pdf",
+        contentType: "application/pdf",
+        byteSize: 198000,
+        checksumSha256:
+          "bb46d6b8d73f4cf142b71f22bcaa4fbfef4d4f1bdd1bcd0ab6f79edcc8dcf122",
+        storageProvider: "local",
+        storageKey: "seed/24032-RMK1-revision-packet-v2.pdf",
+        extractionStatus: "PENDING",
+        uploadedByUserId: "usr_ops_lead",
+        affectsBaseline: true,
+        uploaderNotes: "Supersede decision pending lead review.",
+        isCurrent: false,
+      },
+      {
+        jobReleaseId: intakeDemoRelease.id,
+        intakeBatchId,
+        documentFamily: "QUALITY_CERT",
+        kind: "QUALITY_PDF",
+        revisionNumber: 1,
+        supersedeDecision: "PENDING",
+        fileName: "24032-RMK1-quality-cert.pdf",
+        contentType: "application/pdf",
+        byteSize: 102400,
+        checksumSha256:
+          "cb46d6b8d73f4cf142b71f22bcaa4fbfef4d4f1bdd1bcd0ab6f79edcc8dcf123",
+        storageProvider: "local",
+        storageKey: "seed/24032-RMK1-quality-cert.pdf",
+        extractionStatus: "PENDING",
+        uploadedByUserId: "usr_ops_lead",
+        affectsBaseline: false,
+        uploaderNotes: "Ancillary quality document for extraction handoff.",
+        isCurrent: false,
+      },
+    ])
+    .onConflictDoNothing();
+
+  await db
+    .insert(releaseComments)
+    .values([
+      {
+        jobReleaseId: intakeDemoRelease.id,
+        intakeBatchId,
+        authorUserId: "usr_department_lead",
+        body: "Review revised packet against the approved baseline before releasing to extraction.",
+      },
+      {
+        jobReleaseId: intakeDemoRelease.id,
+        authorUserId: "usr_ops_lead",
+        body: "Customer asked us to preserve prior revision until supersede is approved.",
+      },
+    ])
     .onConflictDoNothing();
 
   await db
@@ -576,7 +758,7 @@ async function main() {
     metadata: {
       users: seededUsers.length,
       departments: 6,
-      version: 2,
+      version: 3,
     },
   });
 
