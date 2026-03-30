@@ -15,6 +15,22 @@ type ExtractionPlaybook = {
   >;
 };
 
+const REVISION_PDF_PLAYBOOK: ExtractionPlaybook = {
+  key: "REVISION_PDF",
+  label: "Revision packet",
+  checklist: [
+    "Confirm revision notes explain the release delta.",
+    "Confirm revised totals reconcile with the stale baseline review.",
+    "Reject if supersede intent is unclear across revision families.",
+  ],
+  allowedFailureReasons: [
+    "DOCUMENT_SET_INVALID",
+    "OCR_QUALITY",
+    "HUMAN_REVIEW_REQUIRED",
+    "NORMALIZATION_ERROR",
+  ],
+};
+
 const playbooks: Record<string, ExtractionPlaybook> = {
   BASELINE_PDF: {
     key: "BASELINE_PDF",
@@ -31,21 +47,7 @@ const playbooks: Record<string, ExtractionPlaybook> = {
       "HUMAN_REVIEW_REQUIRED",
     ],
   },
-  REVISION_PDF: {
-    key: "REVISION_PDF",
-    label: "Revision packet",
-    checklist: [
-      "Confirm revision notes explain the release delta.",
-      "Confirm revised totals reconcile with the stale baseline review.",
-      "Reject if supersede intent is unclear across revision families.",
-    ],
-    allowedFailureReasons: [
-      "DOCUMENT_SET_INVALID",
-      "OCR_QUALITY",
-      "HUMAN_REVIEW_REQUIRED",
-      "NORMALIZATION_ERROR",
-    ],
-  },
+  REVISION_PDF: REVISION_PDF_PLAYBOOK,
   ROUTER_PDF: {
     key: "ROUTER_PDF",
     label: "Router packet",
@@ -77,7 +79,7 @@ const playbooks: Record<string, ExtractionPlaybook> = {
 export function buildPlaybookFromDocumentKinds(kinds: string[]) {
   const orderedKinds = [...new Set(kinds)].sort();
   const primaryKind = orderedKinds[0] ?? "REVISION_PDF";
-  const primary = playbooks[primaryKind] ?? playbooks.REVISION_PDF;
+  const primary = playbooks[primaryKind] ?? REVISION_PDF_PLAYBOOK;
 
   return {
     ...primary,
