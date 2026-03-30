@@ -33,7 +33,7 @@ tsx --test tests/**/*.test.ts               # Run all tests
 ### Folder structure
 
 - `app/` — Next.js routes. Route groups: `(auth)` (sign-in), `(marketing)` (public landing), `(platform)` (all protected pages under `/ops` and `/employee`), `display` (token-gated public kiosk routes). API routes under `app/api/`.
-- `features/` — Domain business logic grouped by feature: `auth`, `extraction`, `governance`, `metrics`, `release-intake`, `releases`, `reporting`, `time`, `work-entries`. Each module contains server actions, queries, Zod schemas, and `components/` sub-folders.
+- `features/` — Domain business logic grouped by feature: `auth`, `extraction`, `governance` (notification preferences + escalation policies), `metrics`, `release-intake`, `releases`, `reporting`, `time`, `work-entries`. Each module contains server actions, queries, Zod schemas, and `components/` sub-folders.
 - `lib/` — Shared infrastructure: `auth/` (Better Auth config + permissions), `db/` (Drizzle client + schema), `ai/` (Gemini wrapper), `audit/`, `storage/`, `env.ts`.
 - `drizzle/` — SQL migration files (11 sequential migrations, never hand-edit).
 - `tests/` — Unit tests using `node:test` + `node:assert/strict`.
@@ -41,7 +41,8 @@ tsx --test tests/**/*.test.ts               # Run all tests
 
 ### Key architectural patterns
 
-- **Server components first.** Client components are used only for interactive auth UI.
+- **Server components first.** Client components are used only for interactive auth UI. The React Compiler (`reactCompiler: true`) is enabled — do not manually memoize with `useMemo`/`useCallback`.
+- **TypeScript is extra-strict.** Beyond `strict: true`, `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` are enabled. Array index access returns `T | undefined`; optional properties cannot be assigned `undefined` explicitly.
 - **Feature modules own their DB queries.** Prefer calling `features/<domain>/queries.ts` or `features/<domain>/actions.ts` rather than writing raw Drizzle queries in route files.
 - **Single permissions source of truth** at `lib/auth/permissions.ts`. Roles: Admin, Ops, Lead, Employee.
 - **Storage abstraction** in `lib/storage/`: `local` driver for dev, `vercel-blob` for production. Never import `@vercel/blob` directly.
@@ -70,6 +71,14 @@ Do not reimplement these — call them directly:
 - `features/extraction/normalization.ts` — AI extraction output normalization
 - `lib/ai/gemini.ts` — Gemini wrapper (never call `@google/generative-ai` directly)
 
+### Domain constraints
+
+- **Release codes:** `R#`, `RMK#`, `RME#`, `A#` formats only.
+- **Job numbers:** 5-digit numeric.
+- **Metric windows:** `DAILY`, `WEEKLY`, `MONTHLY`, `ANNUAL`.
+- **Metric scopes:** `EMPLOYEE`, `DEPARTMENT`, `JOB`, `RELEASE`, `COMPANY`, `PART_FAMILY`.
+- **Public display routes** (`/display/*`) are token-gated via `?access=DISPLAY_ACCESS_TOKEN` query param — not session auth.
+
 ### AI / extraction
 
 Gemini is used for release document extraction. Raw model output, normalized output, confidence, run status, and review status are all persisted. AI output is **never auto-approved** — reviewers must edit fields and explicitly approve. Bulk extraction actions are available from the extraction queue.
@@ -89,3 +98,4 @@ Conditional:
 - `CRON_SECRET` — secures Vercel Cron routes
 - `DISPLAY_ACCESS_TOKEN` — required to expose kiosk/display routes outside ops auth
 - `GEMINI_API_KEY` / `GEMINI_MODEL` — required for AI extraction
+- `LOCAL_FILE_STORAGE_ROOT` — local storage path when `STORAGE_DRIVER=local` (default: `.data/uploads`)
