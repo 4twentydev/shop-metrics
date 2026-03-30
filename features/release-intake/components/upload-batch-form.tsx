@@ -124,7 +124,7 @@ export function UploadBatchForm({ releases }: UploadBatchFormProps) {
         type="hidden"
         name="documentManifest"
         value={JSON.stringify(
-          deferredManifest.map(({ fileName, ...item }) => item),
+          deferredManifest.map(({ fileName: _fileName, ...item }) => item),
         )}
       />
 

@@ -17,6 +17,7 @@ import {
   saveDisplayPlaylistAction,
 } from "@/features/reporting/display-actions";
 import type { getReportingAdminPageData } from "@/features/reporting/admin-queries";
+import Link from "next/link";
 
 type ReportingAdminViewProps = {
   data: Awaited<ReturnType<typeof getReportingAdminPageData>>;
@@ -468,12 +469,12 @@ export function ReportingAdminView({ data }: ReportingAdminViewProps) {
           <div className="rounded-[1.75rem] border border-line/80 bg-panel-strong p-6">
             <p className="font-semibold">Display alerts</p>
             <div className="mt-4 flex flex-wrap gap-3">
-              <a
+              <Link
                 href="/ops/reports/display/monitoring"
                 className="rounded-full border border-line px-4 py-2 text-sm font-semibold"
               >
                 Open kiosk monitoring
-              </a>
+              </Link>
             </div>
             <div className="mt-4 space-y-3 text-sm">
               {data.displayMonitoring.alerts.slice(0, 6).map((alert) => (
