@@ -1,12 +1,24 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 import { SignInPanel } from "@/features/auth/components/sign-in-panel";
+import { getSession } from "@/lib/auth/permissions";
 
 export const metadata: Metadata = {
   title: "Sign in",
 };
 
-export default function SignInPage() {
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const [session, { error }] = await Promise.all([getSession(), searchParams]);
+
+  if (session) {
+    redirect("/employee");
+  }
+
   return (
     <main className="grid-overlay flex min-h-screen items-center justify-center px-6 py-12">
       <div className="grid w-full max-w-6xl gap-8 lg:grid-cols-[0.9fr_1.1fr]">
@@ -38,7 +50,7 @@ export default function SignInPage() {
             </div>
           </div>
         </section>
-        <SignInPanel />
+        <SignInPanel initialError={error} />
       </div>
     </main>
   );

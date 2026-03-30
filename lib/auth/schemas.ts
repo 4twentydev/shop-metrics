@@ -3,6 +3,7 @@ import { z } from "zod";
 export const magicLinkSchema = z.object({
   email: z.string().email(),
   callbackURL: z.string().optional(),
+  errorCallbackURL: z.string().optional(),
 });
 
 export const roleGuardSchema = z.object({
