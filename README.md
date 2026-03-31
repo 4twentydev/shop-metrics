@@ -9,7 +9,7 @@ Production foundation for a panel-centric manufacturing metrics platform built o
 - Tailwind CSS `4` and Motion `12`
 - Neon-compatible Postgres client using `postgres`
 - Drizzle ORM schema, SQL migration, and seed script
-- Better Auth scaffold with passkey-first auth and magic-link fallback
+- Custom PIN-based auth with magic-link fallback
 - Environment variable validation with `zod`
 - Production-safe PDF storage abstraction:
   - local filesystem in development
@@ -36,8 +36,8 @@ Production foundation for a panel-centric manufacturing metrics platform built o
   - business-day helpers: [`features/time/business-day.ts`](./features/time/business-day.ts)
   - extraction normalization: [`features/extraction/normalization.ts`](./features/extraction/normalization.ts)
   - snapshot metrics engine: [`features/metrics/engine.ts`](./features/metrics/engine.ts)
-- Better Auth is configured without email/password accounts. Users are expected to be provisioned by admins, then sign in by passkey or magic link.
-- The initial schema is intentionally operationally focused: users, employees, roles, departments, stations, assignments, shifts, jobs, releases, documents, audit logs, plus the auth support tables Better Auth requires.
+- Auth is custom PIN-based with magic-link fallback. Users are provisioned by admins and sign in with email + PIN.
+- The initial schema is intentionally operationally focused: users, employees, roles, departments, stations, assignments, shifts, jobs, releases, documents, audit logs, and session tables.
 - PDF upload handling is abstracted behind a storage interface so document ingestion can be implemented without binding page logic to a single storage provider.
 - Work-entry workflow is now centralized under `features/work-entries`, including:
   - assignment-derived station and shift resolution
@@ -86,10 +86,7 @@ Required:
 
 - `APP_URL`
 - `DATABASE_URL`
-- `BETTER_AUTH_SECRET`
-- `BETTER_AUTH_URL`
-- `BETTER_AUTH_RP_ID`
-- `BETTER_AUTH_TRUSTED_ORIGIN`
+- `SIGNING_SECRET`
 - `AUTH_FROM_EMAIL`
 
 Conditional:
@@ -149,10 +146,7 @@ Conditional:
 3. Provision Neon and copy the pooled connection string to `DATABASE_URL`.
 4. Set the rest of the environment variables in Vercel:
    - `APP_URL`
-   - `BETTER_AUTH_URL`
-   - `BETTER_AUTH_SECRET`
-   - `BETTER_AUTH_RP_ID`
-   - `BETTER_AUTH_TRUSTED_ORIGIN`
+   - `SIGNING_SECRET`
    - `AUTH_FROM_EMAIL`
    - `RESEND_API_KEY`
    - `STORAGE_DRIVER=vercel-blob`
@@ -290,9 +284,9 @@ Conditional:
 
 ## Auth notes
 
-- Primary sign-in path: passkeys
+- Primary sign-in path: email + PIN
 - Fallback: magic links
-- Disabled: email/password
+- Disabled: passkeys, email/password
 - Role assignment: admin-controlled via seeded roles and the user `activeRole` field
 
 ## Next recommended chunk

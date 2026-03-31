@@ -28,13 +28,13 @@ tsx --test tests/**/*.test.ts               # Run all tests
 
 ## Architecture
 
-**Stack:** Next.js 16 (App Router) · React 19 · TypeScript (strict) · Drizzle ORM · PostgreSQL · Tailwind CSS v4 · Better Auth · Zod v4
+**Stack:** Next.js 16 (App Router) · React 19 · TypeScript (strict) · Drizzle ORM · PostgreSQL · Tailwind CSS v4 · Zod v4
 
 ### Folder structure
 
 - `app/` — Next.js routes. Route groups: `(auth)` (sign-in), `(marketing)` (public landing), `(platform)` (all protected pages under `/ops` and `/employee`), `display` (token-gated public kiosk routes). API routes under `app/api/`.
 - `features/` — Domain business logic grouped by feature: `auth`, `extraction`, `governance` (notification preferences + escalation policies), `metrics`, `release-intake`, `releases`, `reporting`, `time`, `work-entries`. Each module contains server actions, queries, Zod schemas, and `components/` sub-folders.
-- `lib/` — Shared infrastructure: `auth/` (Better Auth config + permissions), `db/` (Drizzle client + schema), `ai/` (Gemini wrapper), `audit/`, `storage/`, `env.ts`.
+- `lib/` — Shared infrastructure: `auth/` (session + permissions), `db/` (Drizzle client + schema), `ai/` (Gemini wrapper), `audit/`, `storage/`, `env.ts`.
 - `drizzle/` — SQL migration files (11 sequential migrations, never hand-edit).
 - `tests/` — Unit tests using `node:test` + `node:assert/strict`.
 - `scripts/` — One-off scripts run with `tsx` (e.g. `seed.ts`).
@@ -59,7 +59,7 @@ Schema source of truth is `lib/db/schema/` (primarily `operations.ts`, ~40 KB). 
 
 ### Authentication
 
-Passkey-first with magic-link fallback via Better Auth. No username/password. Auth tables are managed by Better Auth and defined in `lib/db/schema/auth.ts`.
+PIN-based with magic-link fallback. No username/password or passkeys. Session management is custom (`lib/auth/session.ts`). Auth tables are defined in `lib/db/schema/auth.ts`.
 
 ### Server action pattern
 
@@ -97,7 +97,7 @@ Six Vercel Cron endpoints live under `app/api/cron/`. They are secured with `CRO
 
 ### Environment variables
 
-Required (all environments): `APP_URL`, `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `BETTER_AUTH_RP_ID`, `BETTER_AUTH_TRUSTED_ORIGIN`, `AUTH_FROM_EMAIL`
+Required (all environments): `APP_URL`, `DATABASE_URL`, `SIGNING_SECRET`, `AUTH_FROM_EMAIL`
 
 Conditional:
 - `RESEND_API_KEY` — required in production for magic-link delivery

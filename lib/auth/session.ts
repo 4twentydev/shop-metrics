@@ -47,7 +47,6 @@ export type SessionUser = {
   email: string;
   activeRole: string;
   status: "INVITED" | "ACTIVE" | "SUSPENDED";
-  image: string | null;
 };
 
 /** Look up a valid (non-expired) session and return the associated user. */
@@ -61,7 +60,6 @@ export async function getSessionUser(
       email: users.email,
       activeRole: users.activeRole,
       status: users.status,
-      image: users.image,
     })
     .from(sessions)
     .innerJoin(users, eq(sessions.userId, users.id))

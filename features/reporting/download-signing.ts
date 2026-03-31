@@ -5,7 +5,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { env } from "@/lib/env";
 
 function signPayload(payload: string) {
-  return createHmac("sha256", env.BETTER_AUTH_SECRET).update(payload).digest("hex");
+  return createHmac("sha256", env.SIGNING_SECRET).update(payload).digest("hex");
 }
 
 export function createSignedDownloadQuery(input: {
