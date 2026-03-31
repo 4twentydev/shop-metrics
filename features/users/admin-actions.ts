@@ -133,7 +133,6 @@ export async function createUserAction(formData: FormData) {
     id,
     name,
     email,
-    emailVerified: false,
     status: "ACTIVE",
     activeRole,
     pin: hashPin(id, pin),

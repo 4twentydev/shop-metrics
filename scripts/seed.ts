@@ -75,7 +75,7 @@ async function main() {
       id: "usr_admin_elward",
       name: "Morgan Reyes",
       email: "morgan.reyes@elwardsystems.example",
-      emailVerified: true,
+
       status: "ACTIVE" as const,
       activeRole: "platform_admin",
       pin: hashPin("usr_admin_elward", "1234"),
@@ -84,7 +84,7 @@ async function main() {
       id: "usr_ops_lead",
       name: "Avery Chen",
       email: "avery.chen@elwardsystems.example",
-      emailVerified: true,
+
       status: "ACTIVE" as const,
       activeRole: "ops_lead",
       pin: hashPin("usr_ops_lead", "1234"),
@@ -93,7 +93,7 @@ async function main() {
       id: "usr_employee",
       name: "Jordan Patel",
       email: "jordan.patel@elwardsystems.example",
-      emailVerified: true,
+
       status: "ACTIVE" as const,
       activeRole: "employee",
       pin: hashPin("usr_employee", "1234"),
@@ -102,7 +102,7 @@ async function main() {
       id: "usr_department_lead",
       name: "Taylor Brooks",
       email: "taylor.brooks@elwardsystems.example",
-      emailVerified: true,
+
       status: "ACTIVE" as const,
       activeRole: "department_lead",
       pin: hashPin("usr_department_lead", "1234"),
@@ -111,7 +111,7 @@ async function main() {
       id: "usr_employee_cnc",
       name: "Riley Gomez",
       email: "riley.gomez@elwardsystems.example",
-      emailVerified: true,
+
       status: "ACTIVE" as const,
       activeRole: "employee",
       pin: hashPin("usr_employee_cnc", "1234"),
