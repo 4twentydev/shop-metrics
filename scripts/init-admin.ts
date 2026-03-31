@@ -40,27 +40,34 @@ function hashPin(p: string): string {
 
 const id = "usr_admin_bootstrap";
 
-const existing = await db.query.users.findFirst({ where: eq(users.email, email) });
+async function main() {
+  const existing = await db.query.users.findFirst({ where: eq(users.email, email) });
 
-if (existing) {
-  await db
-    .update(users)
-    .set({ pin: hashPin(pin), status: "ACTIVE", activeRole: "platform_admin", updatedAt: new Date() })
-    .where(eq(users.email, email));
-  console.log(`Updated existing user: ${existing.name} <${email}>`);
-} else {
-  await db.insert(users).values({
-    id,
-    name,
-    email,
-    status: "ACTIVE",
-    activeRole: "platform_admin",
-    pin: hashPin(pin),
-  });
-  console.log(`Created admin user: ${name} <${email}>`);
+  if (existing) {
+    await db
+      .update(users)
+      .set({ pin: hashPin(pin), status: "ACTIVE", activeRole: "platform_admin", updatedAt: new Date() })
+      .where(eq(users.email, email));
+    console.log(`Updated existing user: ${existing.name} <${email}>`);
+  } else {
+    await db.insert(users).values({
+      id,
+      name,
+      email,
+      status: "ACTIVE",
+      activeRole: "platform_admin",
+      pin: hashPin(pin),
+    });
+    console.log(`Created admin user: ${name} <${email}>`);
+  }
+
+  console.log(`PIN set to: ${pin}`);
+  console.log("Done. Log in at /sign-in with this PIN.");
+
+  await sql.end();
 }
 
-console.log(`PIN set to: ${pin}`);
-console.log("Done. Log in at /sign-in with this PIN.");
-
-await sql.end();
+main().catch((err: unknown) => {
+  console.error(err);
+  process.exit(1);
+});
