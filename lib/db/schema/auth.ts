@@ -19,7 +19,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   status: userStatusEnum("status").notNull().default("INVITED"),
   activeRole: varchar("active_role", { length: 64 }).notNull().default("employee"),
-  pin: varchar("pin", { length: 64 }),
+  pin: varchar("pin", { length: 64 }).unique(),
   createdAt: timestamp("created_at", {
     withTimezone: true,
     mode: "date",
