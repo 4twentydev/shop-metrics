@@ -44,12 +44,14 @@ tsx --test tests/**/*.test.ts               # Run all tests
 - **Server components first.** Client components are used only for interactive auth UI. The React Compiler (`reactCompiler: true`) is enabled — do not manually memoize with `useMemo`/`useCallback`.
 - **TypeScript is extra-strict.** Beyond `strict: true`, `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` are enabled. Array index access returns `T | undefined`; optional properties cannot be assigned `undefined` explicitly.
 - **Feature modules own their DB queries.** Prefer calling `features/<domain>/queries.ts` or `features/<domain>/actions.ts` rather than writing raw Drizzle queries in route files.
-- **Single permissions source of truth** at `lib/auth/permissions.ts`. Roles: Admin, Ops, Lead, Employee.
+- **Single permissions source of truth** at `lib/auth/permissions.ts`. Role slugs: `platform_admin`, `ops_lead`, `department_lead`, `employee`. `OPS_ROLES` is the set `[platform_admin, ops_lead, department_lead]`.
 - **Storage abstraction** in `lib/storage/`: `local` driver for dev, `vercel-blob` for production. Never import `@vercel/blob` directly.
 - **Audit logging** via helpers in `lib/audit/` — call these for any state-mutating operations.
 - **Snapshot-based metrics** — the metrics engine (`features/metrics/`) computes aggregates on demand and stores them as snapshots; targets are compared at read time.
 - **Environment validation** via Zod schema in `lib/env.ts` (server-only). Add new env vars there. Production enforces `STORAGE_DRIVER=vercel-blob` and requires `RESEND_API_KEY`.
 - **Typed routes** are enabled (`typedRoutes: true` in `next.config.ts`) — use `href` values that satisfy the route type.
+- **Path alias** `@/*` resolves to the repo root (e.g., `@/lib/db`, `@/features/metrics/engine`).
+- **Shared utilities** in `lib/utils.ts`: `cn()` (clsx + tailwind-merge), `formatPercent()`, `formatNumber()`.
 
 ### Database schema
 
@@ -59,17 +61,23 @@ Schema source of truth is `lib/db/schema/` (primarily `operations.ts`, ~40 KB). 
 
 Passkey-first with magic-link fallback via Better Auth. No username/password. Auth tables are managed by Better Auth and defined in `lib/db/schema/auth.ts`.
 
+### Server action pattern
+
+Every `"use server"` action must: (1) call `requireSession()` or `requireOpsRole()` first, (2) validate input with Zod, (3) perform the DB write, (4) call `writeAuditLog()`, (5) call `revalidatePath()` for affected routes. See `features/releases/admin-actions.ts` as a reference.
+
 ### Centralized business logic
 
 Do not reimplement these — call them directly:
 
-- `lib/auth/permissions.ts` — role/permission checks
+- `lib/auth/permissions.ts` — `requireSession()`, `requireRole([...slugs])`, `requireOpsRole()` (all redirect on failure, use in page components and server actions)
 - `features/releases/status.ts` — release state transitions
 - `features/metrics/formulas.ts` — panel-equivalent output formulas (tested)
 - `features/metrics/engine.ts` — snapshot computation and aggregation
 - `features/time/business-day.ts` — business-day helpers
+- `features/work-entries/business.ts` — shift-based business date resolution
 - `features/extraction/normalization.ts` — AI extraction output normalization
 - `lib/ai/gemini.ts` — Gemini wrapper (never call `@google/generative-ai` directly)
+- `lib/audit/log.ts` — `writeAuditLog()` (must be called for all state-mutating operations)
 
 ### Domain constraints
 
