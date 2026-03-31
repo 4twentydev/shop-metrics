@@ -8,12 +8,8 @@ export const metadata: Metadata = {
   title: "Sign in",
 };
 
-export default async function SignInPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>;
-}) {
-  const [session, { error }] = await Promise.all([getSession(), searchParams]);
+export default async function SignInPage() {
+  const session = await getSession();
 
   if (session) {
     redirect("/employee");
@@ -27,12 +23,11 @@ export default async function SignInPage({
             Secure access
           </p>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight">
-            Passkeys first, magic links when needed.
+            Sign in with your email and PIN.
           </h1>
           <p className="mt-6 max-w-xl text-base leading-7 text-muted">
-            Elward Systems Metrics avoids password accounts entirely. Users are
-            invited by an administrator, authenticate with a registered
-            passkey when available, and fall back to time-limited magic links.
+            Use your work email and the 4-digit PIN assigned by your
+            administrator. Contact an admin if you don&apos;t have a PIN yet.
           </p>
           <div className="mt-8 grid gap-4 text-sm text-muted sm:grid-cols-2">
             <div className="rounded-2xl border border-line/80 bg-panel-strong p-4">
@@ -43,14 +38,14 @@ export default async function SignInPage({
               </p>
             </div>
             <div className="rounded-2xl border border-line/80 bg-panel-strong p-4">
-              <p className="font-semibold text-white">Short-lived links</p>
+              <p className="font-semibold text-white">PIN authentication</p>
               <p className="mt-2">
-                Fallback magic links expire quickly and can be fully audited.
+                PINs are set by administrators and can be changed at any time.
               </p>
             </div>
           </div>
         </section>
-        <SignInPanel {...(error !== undefined ? { initialError: error } : {})} />
+        <SignInPanel />
       </div>
     </main>
   );

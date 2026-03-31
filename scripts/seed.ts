@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db/client";
@@ -65,6 +66,10 @@ async function main() {
     ])
     .onConflictDoNothing();
 
+  function hashPin(userId: string, pin: string): string {
+    return crypto.createHash("sha256").update(`${userId}:${pin}`).digest("hex");
+  }
+
   const seededUsers = [
     {
       id: "usr_admin_elward",
@@ -73,6 +78,7 @@ async function main() {
       emailVerified: true,
       status: "ACTIVE" as const,
       activeRole: "platform_admin",
+      pin: hashPin("usr_admin_elward", "1234"),
     },
     {
       id: "usr_ops_lead",
@@ -81,6 +87,7 @@ async function main() {
       emailVerified: true,
       status: "ACTIVE" as const,
       activeRole: "ops_lead",
+      pin: hashPin("usr_ops_lead", "1234"),
     },
     {
       id: "usr_employee",
@@ -89,6 +96,7 @@ async function main() {
       emailVerified: true,
       status: "ACTIVE" as const,
       activeRole: "employee",
+      pin: hashPin("usr_employee", "1234"),
     },
     {
       id: "usr_department_lead",
@@ -97,6 +105,7 @@ async function main() {
       emailVerified: true,
       status: "ACTIVE" as const,
       activeRole: "department_lead",
+      pin: hashPin("usr_department_lead", "1234"),
     },
     {
       id: "usr_employee_cnc",
@@ -105,6 +114,7 @@ async function main() {
       emailVerified: true,
       status: "ACTIVE" as const,
       activeRole: "employee",
+      pin: hashPin("usr_employee_cnc", "1234"),
     },
   ];
 
