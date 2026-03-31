@@ -85,6 +85,13 @@
       "when": 1774862581069,
       "tag": "0011_red_namora",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1743379200000,
+      "tag": "0012_add_pin",
+      "breakpoints": true
     }
   ]
 }

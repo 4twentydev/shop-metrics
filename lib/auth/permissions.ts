@@ -1,16 +1,19 @@
 import "server-only";
 
 import { cache } from "react";
-import { headers } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { auth } from "@/lib/auth/server";
+import { getSessionUser, SESSION_COOKIE } from "@/lib/auth/session";
 import { OPS_ROLES, type RoleSlug } from "@/lib/auth/roles";
 
 export const getSession = cache(async () => {
-  return auth.api.getSession({
-    headers: await headers(),
-  });
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE)?.value;
+  if (!token) return null;
+  const user = await getSessionUser(token);
+  if (!user) return null;
+  return { user };
 });
 
 export async function requireSession() {

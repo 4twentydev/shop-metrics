@@ -9,11 +9,7 @@ const envSchema = z
       .default("development"),
     APP_URL: z.string().url(),
     DATABASE_URL: z.string().min(1),
-    BETTER_AUTH_SECRET: z.string().min(32),
-    BETTER_AUTH_URL: z.string().url(),
-    BETTER_AUTH_RP_ID: z.string().min(1),
-    BETTER_AUTH_TRUSTED_ORIGIN: z.string().url(),
-    AUTH_FROM_EMAIL: z.string().email(),
+    SESSION_SECRET: z.string().min(32),
     RESEND_API_KEY: z.string().min(1).optional(),
     STORAGE_DRIVER: z.enum(["local", "vercel-blob"]).default("local"),
     LOCAL_FILE_STORAGE_ROOT: z.string().min(1).default(".data/uploads"),
@@ -45,15 +41,6 @@ const envSchema = z
       });
     }
 
-    if (value.NODE_ENV === "production" && !value.RESEND_API_KEY) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message:
-          "RESEND_API_KEY is required in production to deliver magic links.",
-        path: ["RESEND_API_KEY"],
-      });
-    }
-
     if (value.NODE_ENV === "production" && !value.GEMINI_API_KEY) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -67,11 +54,7 @@ export const env = envSchema.parse({
   NODE_ENV: process.env.NODE_ENV,
   APP_URL: process.env.APP_URL,
   DATABASE_URL: process.env.DATABASE_URL,
-  BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
-  BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
-  BETTER_AUTH_RP_ID: process.env.BETTER_AUTH_RP_ID,
-  BETTER_AUTH_TRUSTED_ORIGIN: process.env.BETTER_AUTH_TRUSTED_ORIGIN,
-  AUTH_FROM_EMAIL: process.env.AUTH_FROM_EMAIL,
+  SESSION_SECRET: process.env.SESSION_SECRET,
   RESEND_API_KEY: process.env.RESEND_API_KEY,
   STORAGE_DRIVER: process.env.STORAGE_DRIVER,
   LOCAL_FILE_STORAGE_ROOT: process.env.LOCAL_FILE_STORAGE_ROOT,

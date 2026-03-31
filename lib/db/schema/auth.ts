@@ -24,6 +24,7 @@ export const users = pgTable("users", {
   image: text("image"),
   status: userStatusEnum("status").notNull().default("INVITED"),
   activeRole: varchar("active_role", { length: 64 }).notNull().default("employee"),
+  pin: varchar("pin", { length: 64 }),
   createdAt: timestamp("created_at", {
     withTimezone: true,
     mode: "date",

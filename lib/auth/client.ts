@@ -1,9 +1,2 @@
-"use client";
-
-import { passkeyClient } from "@better-auth/passkey/client";
-import { createAuthClient } from "better-auth/client";
-import { magicLinkClient } from "better-auth/client/plugins";
-
-export const authClient = createAuthClient({
-  plugins: [passkeyClient(), magicLinkClient()],
-});
+// Better Auth client removed — authentication is now handled by PIN-based custom auth.
+// See features/auth/components/sign-in-panel.tsx and sign-out-button.tsx.
