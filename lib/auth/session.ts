@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 
 import { and, eq, gt } from "drizzle-orm";
 
+import { env } from "@/lib/env";
 import { db } from "@/lib/db";
 import { sessions, users } from "@/lib/db/schema/auth";
 
@@ -18,11 +19,11 @@ export const SESSION_COOKIE_OPTIONS = {
   maxAge: SESSION_DURATION_MS / 1000,
 };
 
-/** Hash a PIN against a user ID as salt (SHA-256). */
-export function hashPin(userId: string, pin: string): string {
+/** Hash a PIN with the app signing secret as salt (SHA-256). */
+export function hashPin(pin: string): string {
   return crypto
     .createHash("sha256")
-    .update(`${userId}:${pin}`)
+    .update(`${env.SIGNING_SECRET}:${pin}`)
     .digest("hex");
 }
 

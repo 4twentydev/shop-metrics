@@ -23,11 +23,11 @@ export default async function SignInPage() {
             Secure access
           </p>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight">
-            Sign in with your email and PIN.
+            Sign in with your PIN.
           </h1>
           <p className="mt-6 max-w-xl text-base leading-7 text-muted">
-            Use your work email and the 4-digit PIN assigned by your
-            administrator. Contact an admin if you don&apos;t have a PIN yet.
+            Enter the 4-digit PIN assigned by your administrator. Contact an
+            admin if you don&apos;t have a PIN yet.
           </p>
           <div className="mt-8 grid gap-4 text-sm text-muted sm:grid-cols-2">
             <div className="rounded-2xl border border-line/80 bg-panel-strong p-4">

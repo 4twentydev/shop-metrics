@@ -38,7 +38,7 @@ export async function setUserPinAction(formData: FormData) {
 
   await db
     .update(users)
-    .set({ pin: hashPin(userId, pin), updatedAt: new Date() })
+    .set({ pin: hashPin(pin), updatedAt: new Date() })
     .where(eq(users.id, userId));
 
   await writeAuditLog({
@@ -135,7 +135,7 @@ export async function createUserAction(formData: FormData) {
     email,
     status: "ACTIVE",
     activeRole,
-    pin: hashPin(id, pin),
+    pin: hashPin(pin),
   });
 
   await writeAuditLog({

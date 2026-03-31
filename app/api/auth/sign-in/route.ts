@@ -21,13 +21,12 @@ export async function POST(req: NextRequest) {
   if (
     typeof body !== "object" ||
     body === null ||
-    typeof (body as Record<string, unknown>).email !== "string" ||
     typeof (body as Record<string, unknown>).pin !== "string"
   ) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
-  const { email, pin } = body as { email: string; pin: string };
+  const { pin } = body as { pin: string };
 
   if (!/^\d{4}$/.test(pin)) {
     return NextResponse.json({ error: "Invalid credentials." }, { status: 401 });
@@ -36,16 +35,12 @@ export async function POST(req: NextRequest) {
   const rows = await db
     .select()
     .from(users)
-    .where(eq(users.email, email.toLowerCase().trim()))
+    .where(eq(users.pin, hashPin(pin)))
     .limit(1);
 
   const user = rows[0];
 
-  if (!user || user.status !== "ACTIVE" || !user.pin) {
-    return NextResponse.json({ error: "Invalid credentials." }, { status: 401 });
-  }
-
-  if (user.pin !== hashPin(user.id, pin)) {
+  if (!user || user.status !== "ACTIVE") {
     return NextResponse.json({ error: "Invalid credentials." }, { status: 401 });
   }
 

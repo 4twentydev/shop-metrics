@@ -66,8 +66,9 @@ async function main() {
     ])
     .onConflictDoNothing();
 
-  function hashPin(userId: string, pin: string): string {
-    return crypto.createHash("sha256").update(`${userId}:${pin}`).digest("hex");
+  const signingSecret = process.env["SIGNING_SECRET"] ?? "dev-seed";
+  function hashPin(pin: string): string {
+    return crypto.createHash("sha256").update(`${signingSecret}:${pin}`).digest("hex");
   }
 
   const seededUsers = [
@@ -78,7 +79,7 @@ async function main() {
 
       status: "ACTIVE" as const,
       activeRole: "platform_admin",
-      pin: hashPin("usr_admin_elward", "1234"),
+      pin: hashPin("1001"),
     },
     {
       id: "usr_ops_lead",
@@ -87,7 +88,7 @@ async function main() {
 
       status: "ACTIVE" as const,
       activeRole: "ops_lead",
-      pin: hashPin("usr_ops_lead", "1234"),
+      pin: hashPin("1002"),
     },
     {
       id: "usr_employee",
@@ -96,7 +97,7 @@ async function main() {
 
       status: "ACTIVE" as const,
       activeRole: "employee",
-      pin: hashPin("usr_employee", "1234"),
+      pin: hashPin("1003"),
     },
     {
       id: "usr_department_lead",
@@ -105,7 +106,7 @@ async function main() {
 
       status: "ACTIVE" as const,
       activeRole: "department_lead",
-      pin: hashPin("usr_department_lead", "1234"),
+      pin: hashPin("1004"),
     },
     {
       id: "usr_employee_cnc",
@@ -114,7 +115,7 @@ async function main() {
 
       status: "ACTIVE" as const,
       activeRole: "employee",
-      pin: hashPin("usr_employee_cnc", "1234"),
+      pin: hashPin("1005"),
     },
   ];
 

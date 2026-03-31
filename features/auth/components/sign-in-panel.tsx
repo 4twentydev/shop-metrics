@@ -6,7 +6,6 @@ import { motion } from "motion/react";
 
 export function SignInPanel() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
   const [pin, setPin] = useState(["", "", "", ""]);
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,10 +41,6 @@ export function SignInPanel() {
       setError("Enter your 4-digit PIN.");
       return;
     }
-    if (!email.trim()) {
-      setError("Enter your email.");
-      return;
-    }
 
     setIsPending(true);
 
@@ -53,7 +48,7 @@ export function SignInPanel() {
       const res = await fetch("/api/auth/sign-in", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), pin: pinString }),
+        body: JSON.stringify({ pin: pinString }),
       });
 
       if (!res.ok) {
@@ -61,7 +56,7 @@ export function SignInPanel() {
         setError(
           typeof (data as { error?: string }).error === "string"
             ? (data as { error: string }).error
-            : "Sign-in failed. Check your email and PIN.",
+            : "Invalid PIN.",
         );
         setIsPending(false);
         return;
@@ -89,32 +84,13 @@ export function SignInPanel() {
           Sign in
         </p>
         <h2 className="mt-3 text-2xl font-semibold tracking-tight">
-          Enter your email and PIN.
+          Enter your PIN.
         </h2>
 
         <form
           onSubmit={(event) => void handleSubmit(event)}
           className="mt-6 space-y-5"
         >
-          <div>
-            <label
-              className="block text-sm font-medium text-muted"
-              htmlFor="email"
-            >
-              Work email
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="name@elwardsystems.com"
-              className="mt-2 w-full rounded-full border border-line bg-white/[0.03] px-4 py-3 outline-none transition focus:border-accent"
-            />
-          </div>
-
           <div>
             <label className="block text-sm font-medium text-muted">
               4-digit PIN
@@ -128,6 +104,7 @@ export function SignInPanel() {
                   inputMode="numeric"
                   maxLength={1}
                   value={digit}
+                  autoFocus={i === 0}
                   onChange={(event) => handlePinChange(i, event.target.value)}
                   onKeyDown={(event) => handlePinKeyDown(i, event)}
                   className="h-14 w-14 rounded-2xl border border-line bg-white/[0.03] text-center text-xl font-semibold outline-none transition focus:border-accent"
