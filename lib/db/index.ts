@@ -15,6 +15,7 @@ const sql =
   postgres(env.DATABASE_URL, {
     prepare: false,
     max: env.NODE_ENV === "development" ? 5 : 10,
+    ssl: "require",
   });
 
 if (env.NODE_ENV !== "production") {

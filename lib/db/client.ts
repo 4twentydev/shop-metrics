@@ -8,7 +8,7 @@ if (!databaseUrl) {
   throw new Error("DATABASE_URL environment variable is required");
 }
 
-const sql = postgres(databaseUrl, { prepare: false, max: 5 });
+const sql = postgres(databaseUrl, { prepare: false, max: 5, ssl: "require" });
 
 export const db = drizzle(sql, { schema });
 export { sql };

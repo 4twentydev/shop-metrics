@@ -9,20 +9,33 @@ export function SignInPanel() {
   const [pin, setPin] = useState(["", "", "", ""]);
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const inputRefs = [
-    useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null),
-  ];
+  const ref0 = useRef<HTMLInputElement>(null);
+  const ref1 = useRef<HTMLInputElement>(null);
+  const ref2 = useRef<HTMLInputElement>(null);
+  const ref3 = useRef<HTMLInputElement>(null);
+  const inputRefs = [ref0, ref1, ref2, ref3];
 
   function handlePinChange(index: number, value: string) {
+    if (/^\d{4}$/.test(value)) {
+      setPin(value.split(""));
+      inputRefs[3]?.current?.focus();
+      return;
+    }
     if (!/^\d?$/.test(value)) return;
     const next = [...pin];
     next[index] = value;
     setPin(next);
     if (value && index < 3) {
       inputRefs[index + 1]?.current?.focus();
+    }
+  }
+
+  function handlePinPaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    const pasted = e.clipboardData.getData("text");
+    if (/^\d{4}$/.test(pasted)) {
+      e.preventDefault();
+      setPin(pasted.split(""));
+      inputRefs[3]?.current?.focus();
     }
   }
 
@@ -107,6 +120,7 @@ export function SignInPanel() {
                   autoFocus={i === 0}
                   onChange={(event) => handlePinChange(i, event.target.value)}
                   onKeyDown={(event) => handlePinKeyDown(i, event)}
+                  onPaste={handlePinPaste}
                   className="h-14 w-14 rounded-2xl border border-line bg-white/[0.03] text-center text-xl font-semibold outline-none transition focus:border-accent"
                 />
               ))}
